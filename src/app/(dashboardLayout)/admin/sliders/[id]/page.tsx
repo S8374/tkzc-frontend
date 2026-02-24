@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/(dashboard)/slider/edit/[id]/page.tsx
 "use client";
 
@@ -209,9 +210,8 @@ export default function EditSliderPage() {
             setLoading(true);
             await sliderService.updateSlider(sliderId, formData);
             toast.success("Slider updated successfully!");
-            router.push("/admin/slider-controll");
         } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Failed to update slider");
+            toast.error( "Failed to update slider");
         } finally {
             setLoading(false);
         }

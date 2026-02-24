@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { authService } from "@/services/api/auth.services";
 import ReCAPTCHA from "react-google-recaptcha";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ interface SignInModalProps {
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
-
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [imHuman, setImHuman] = useState(false);
@@ -60,6 +61,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       });
       toast.success("Login successful 🎉");
       onClose();
+      router.push("/deposit")
       console.log("Logged in user:", res);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Login failed");

@@ -182,7 +182,6 @@ const CreateSliderPage = () => {
             setLoading(true);
             await sliderService.createSlider(formData);
             toast.success("Slider created successfully!");
-            router.push("/admin/slider-controll");
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to create slider");
         } finally {
@@ -192,7 +191,6 @@ const CreateSliderPage = () => {
 
     const handleCancel = () => {
         if (confirm('Are you sure you want to cancel? All entered data will be lost.')) {
-            router.push('/admin/slider-controll');
         }
     };
 

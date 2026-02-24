@@ -38,7 +38,14 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
           { title: "Add Slider Type", url: "/admin/add-slider-type", icon: SquarePlus },
           { title: "Add Slider", url: "/admin/sliders", icon: SquarePlus },
         ],
-      }
+      },
+        {
+        title: "Deposite",
+        icon: PilcrowLeft,
+        items: [
+          { title: "Deposite Handel", url: "/admin/add-deposite", icon: Settings },
+        ],
+      },
     ],
   }
   ,

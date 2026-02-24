@@ -2,6 +2,7 @@
 "use client";
 
 import { authService } from "@/services/api/auth.services";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import toast from "react-hot-toast";
@@ -13,6 +14,7 @@ interface SignUpModalProps {
 
 export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -69,6 +71,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       });
       console.log("reponse", res);
       toast.success("Registration successful 🎉");
+      router.push("/deposit")
       onClose();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Registration failed");
