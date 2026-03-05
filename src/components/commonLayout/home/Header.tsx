@@ -49,13 +49,12 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const languages = [
-    { code: "en", name: "English", flag: "🇺🇸" },
-    { code: "bn", name: "বাংলা (Bangla)", flag: "🇧🇩" },
-    { code: "hi", name: "हिन्दी (Hindi)", flag: "🇮🇳" },
-    { code: "ar", name: "العربية (Arabic)", flag: "🇸🇦" },
-    { code: "es", name: "Español", flag: "🇪🇸" },
-  ];
+const languages = [
+  { code: "en", name: "English",          flag: "🇬🇧" },
+  { code: "bn", name: "বাংলা",             flag: "🇧🇩" },
+  { code: "zh", name: "中文 (简体)",       flag: "🇨🇳" },
+  { code: "vi", name: "Tiếng Việt",       flag: "🇻🇳" },
+];
 
   const [selectedLang, setSelectedLang] = useState(languages[0]);
 
