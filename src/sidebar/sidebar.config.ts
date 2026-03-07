@@ -45,6 +45,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         icon: PilcrowLeft,
         items: [
           { title: "Deposite Handel", url: "/admin/add-deposite", icon: Settings },
+            { title: "Deposite Request", url: "/admin/deposit-requests", icon: Settings },
         ],
       },
       {

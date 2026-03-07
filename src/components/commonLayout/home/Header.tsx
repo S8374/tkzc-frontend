@@ -21,7 +21,7 @@ const Header = () => {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // ✅ Only ONE fetchUser function
+  // ✅ Fetch user function
   const fetchUser = async () => {
     try {
       setLoading(true);
@@ -38,6 +38,7 @@ const Header = () => {
   useEffect(() => {
     fetchUser();
   }, []);
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,13 +50,14 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-const languages = [
-  { code: "en", name: "English",          flag: "🇬🇧" },
-  { code: "bn", name: "বাংলা",             flag: "🇧🇩" },
-  { code: "zh", name: "中文 (简体)",       flag: "🇨🇳" },
-  { code: "vi", name: "Tiếng Việt",       flag: "🇻🇳" },
-];
+  const languages = [
+    { code: "en", name: "English",          flag: "🇬🇧" },
+    { code: "bn", name: "বাংলা",             flag: "🇧🇩" },
+    { code: "zh", name: "中文 (简体)",       flag: "🇨🇳" },
+    { code: "vi", name: "Tiếng Việt",       flag: "🇻🇳" },
+  ];
 
+  const wallet = user?.wallet || { balance: 0 };
   const [selectedLang, setSelectedLang] = useState(languages[0]);
 
   const isLoggedIn = !!user;
@@ -76,7 +78,10 @@ const languages = [
               <div className="h-9 w-24 animate-pulse rounded-full bg-muted" />
             ) : isLoggedIn ? (
               <>
-                <BalanceHeader />
+                <BalanceHeader 
+                  wallet={wallet} 
+                  onRefresh={fetchUser} // Pass refresh function to update header when balance changes
+                />
                 {/* You can also show username, avatar, logout button, etc. here */}
               </>
             ) : (
@@ -120,10 +125,11 @@ const languages = [
                         setSelectedLang(lang);
                         setIsLanguageOpen(false);
                       }}
-                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition ${selectedLang.code === lang.code
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition ${
+                        selectedLang.code === lang.code
                           ? "bg-accent font-medium"
                           : "hover:bg-accent/60"
-                        }`}
+                      }`}
                     >
                       <span className="text-xl">{lang.flag}</span>
                       <span>{lang.name}</span>
@@ -136,17 +142,17 @@ const languages = [
         </div>
       </header>
 
-{/* ✅ Pass fetchUser */}
+      {/* ✅ Pass fetchUser */}
       <SignInModal
         isOpen={isSignInOpen}
         onClose={() => setIsSignInOpen(false)}
         onLoginSuccess={fetchUser}
       />
-     <SignUpModal
-  isOpen={isSignUpOpen}
-  onClose={() => setIsSignUpOpen(false)}
-  onRegisterSuccess={fetchUser}   // ✅ ADD THIS
-/>
+      <SignUpModal
+        isOpen={isSignUpOpen}
+        onClose={() => setIsSignUpOpen(false)}
+        onRegisterSuccess={fetchUser}
+      />
     </>
   );
 };

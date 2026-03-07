@@ -11,16 +11,14 @@ import {
   XCircle,
   Gift,
   Percent,
-  TrendingUp,
   Sparkles,
-  Zap,
-  Award,
-  Calendar,
   ChevronRight
 } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { depositService } from "@/services/api/deposit.service";
-import { promotionService, Promotion } from "@/services/api/promotion.service";
+import { useRouter } from "next/navigation";
+import { Promotion, promotionService } from "@/services/api/promotion.service";
+import { depositRequestService } from "@/services/api/depositRequest.service";
 
 type Tab = "manual" | "auto" | "crypto";
 
@@ -56,11 +54,16 @@ interface FormField {
 }
 
 export default function DepositPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("manual");
   const [copied, setCopied] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
-  const [showPromoDetails, setShowPromoDetails] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submittedRequest, setSubmittedRequest] = useState<any>(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>("");
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -82,10 +85,16 @@ export default function DepositPage() {
 
   // Calculate bonus when amount changes
   useEffect(() => {
-    const amountField = formFields.find(f => f.name === 'amount' || f.label.toLowerCase().includes('amount'));
+    // Find the amount field - it could be named 'amount' or have 'amount' in the label
+    const amountField = formFields.find(f => 
+      f.name === 'number' || 
+      f.name === 'Amount' || 
+      f.label.toLowerCase().includes('amount')
+    );
+    
     if (amountField && formData[amountField.name] && promotions.length > 0) {
       const amount = parseFloat(formData[amountField.name]);
-      if (!isNaN(amount)) {
+      if (!isNaN(amount) && amount > 0) {
         calculateBonus(amount);
       } else {
         setCalculatedBonus(null);
@@ -103,6 +112,10 @@ export default function DepositPage() {
       const methodsRes = await depositService.getPaymentMethodByTab(activeTab);
       if (methodsRes?.success) {
         setPaymentMethods(methodsRes.data || []);
+        // Auto-select first method if available
+        if (methodsRes.data.length > 0) {
+          setSelectedMethod(methodsRes.data[0]);
+        }
       }
 
       // Fetch instructions for this tab
@@ -138,6 +151,7 @@ export default function DepositPage() {
 
   const calculateBonus = (amount: number) => {
     let maxBonus = 0;
+    let bestPromotion: Promotion | null = null;
     
     promotions.forEach(promo => {
       if (!promo.isActive) return;
@@ -158,17 +172,17 @@ export default function DepositPage() {
         bonus = promo.value;
       }
       
-      // Apply max bonus limit
-      if (promo.maxBonus && bonus > promo.maxBonus) {
-        bonus = promo.maxBonus;
-      }
-      
+      // No maxBonus field - just take the highest bonus
       if (bonus > maxBonus) {
         maxBonus = bonus;
+        bestPromotion = promo;
       }
     });
     
     setCalculatedBonus(maxBonus > 0 ? maxBonus : null);
+    if (bestPromotion) {
+      setSelectedPromotion(bestPromotion);
+    }
   };
 
   const copyAddress = () => {
@@ -181,22 +195,119 @@ export default function DepositPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadStatus('uploading');
-      // Simulate upload - replace with actual upload logic
-      setTimeout(() => {
-        setUploadStatus('success');
-        setTimeout(() => setUploadStatus('idle'), 3000);
-      }, 2000);
-    }
+    if (!file) return;
+
+    setUploadStatus('uploading');
+    
+    // Simulate upload - replace with actual ImageBB or your upload logic
+    setTimeout(() => {
+      // Mock successful upload
+      const mockUrl = "https://i.ibb.co/example/uploaded-image.jpg";
+      setUploadedFileUrl(mockUrl);
+      setUploadStatus('success');
+      setTimeout(() => setUploadStatus('idle'), 3000);
+    }, 2000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", { tab: activeTab, ...formData, bonus: calculatedBonus });
-    alert(`Deposit request submitted!${calculatedBonus ? ` You'll get ৳${calculatedBonus} bonus!` : ''}`);
+    
+    // Find the amount field
+    const amountField = formFields.find(f => 
+      f.name === 'amount' || 
+      f.name === 'Amount' || 
+      f.label.toLowerCase().includes('amount')
+    );
+    
+    // Check if amount is valid
+    let amount = 0;
+    if (amountField && formData[amountField.name]) {
+      amount = parseFloat(formData[amountField.name]);
+      if (isNaN(amount) || amount <= 0) {
+        alert("Please enter a valid amount");
+        return;
+      }
+    } else {
+      alert("Please enter an amount");
+      return;
+    }
+
+    // Check if payment method is selected
+    if (!selectedMethod) {
+      alert("Please select a payment method");
+      return;
+    }
+
+    // Check required fields
+    const missingFields = formFields
+      .filter(f => f.required && !formData[f.name])
+      .map(f => f.label);
+    
+    if (missingFields.length > 0) {
+      alert(`Please fill in: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      // Prepare request data
+      const requestData: any = {
+        depositType: activeTab,
+        paymentMethod: selectedMethod.name,
+        amount: amount,
+        formData: formData,
+      };
+
+      // Add promotion if selected and bonus calculated
+      if (selectedPromotion && calculatedBonus) {
+        requestData.promotionId = selectedPromotion._id;
+        requestData.promotionName = selectedPromotion.bonusName;
+        requestData.promotionType = selectedPromotion.type;
+        requestData.promotionValue = selectedPromotion.value;
+      }
+
+      // Add screenshot if uploaded
+      if (uploadStatus === 'success' && uploadedFileUrl) {
+        requestData.screenshot = uploadedFileUrl;
+      }
+
+      // Add transaction details for crypto/auto
+      if (activeTab === 'crypto') {
+        requestData.walletAddress = formData.walletAddress || walletAddress;
+        requestData.transactionId = formData.transactionId;
+      }
+
+      if (activeTab === 'auto') {
+        requestData.senderNumber = formData.senderNumber;
+        requestData.transactionId = formData.transactionId;
+      }
+
+      const response = await depositRequestService.createRequest(requestData);
+      
+      if (response?.success) {
+        setSubmittedRequest(response.data);
+        setShowSuccessModal(true);
+        
+        // Reset form
+        const initialData: Record<string, string> = {};
+        formFields.forEach((field: FormField) => {
+          initialData[field.name] = '';
+        });
+        setFormData(initialData);
+        setSelectedPromotion(null);
+        setCalculatedBonus(null);
+        setUploadStatus('idle');
+        setUploadedFileUrl("");
+      }
+    } catch (error) {
+      console.error("Failed to submit deposit request:", error);
+      alert("Failed to submit deposit request. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Get icon for payment method
@@ -261,28 +372,31 @@ export default function DepositPage() {
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => setActiveTab("manual")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "manual"
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === "manual"
                 ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
                 : "bg-[#0689ff] text-white border border-white"
-              }`}
+            }`}
           >
             BDT - Manual
           </button>
           <button
             onClick={() => setActiveTab("auto")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "auto"
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === "auto"
                 ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
                 : "bg-[#0689ff] text-white border border-white"
-              }`}
+            }`}
           >
             Auto Deposit
           </button>
           <button
             onClick={() => setActiveTab("crypto")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "crypto"
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === "crypto"
                 ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
                 : "bg-[#0689ff] text-white border border-white"
-              }`}
+            }`}
           >
             Crypto Deposit
           </button>
@@ -290,7 +404,7 @@ export default function DepositPage() {
       </div>
 
       {/* Promotions Banner - Only show if there are active promotions */}
-      {promotions.length > 0 && (
+      {promotions.filter(p => p.isActive).length > 0 && (
         <div className="px-4 mt-2 mb-4">
           <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-4 border border-purple-500/30">
             <div className="flex items-center justify-between mb-3">
@@ -334,15 +448,14 @@ export default function DepositPage() {
                           </div>
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
                     
-                    {/* Bonus Preview */}
-                    {calculatedBonus && activeTab === promo.tab && (
+                    {/* Bonus Preview - Only show if this promotion is selected */}
+                    {calculatedBonus && selectedPromotion?._id === promo._id && (
                       <div className="mt-2 pt-2 border-t border-gray-700">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-400">You'll get:</span>
-                          <span className="text-green-400 font-bold">+ ৳{calculatedBonus}</span>
+                          <span className="text-green-400 font-bold">+ ৳{calculatedBonus.toFixed(2)}</span>
                         </div>
                       </div>
                     )}
@@ -358,13 +471,18 @@ export default function DepositPage() {
       <div className="max-w-md mx-auto px-4 mt-4">
         {activeTab === "manual" && (
           <form onSubmit={handleSubmit} className="bg-[#252334] rounded-2xl p-5 border border-gray-800/50">
-            {/* Payment Methods */}
+            {/* Payment Methods - Make them selectable */}
             {paymentMethods.length > 0 && (
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {paymentMethods.map((method) => (
                   <div
                     key={method._id}
-                    className="bg-white rounded-xl p-2 h-14 flex items-center justify-center text-black border border-green-500 hover:scale-105 transition cursor-pointer shadow-lg"
+                    onClick={() => setSelectedMethod(method)}
+                    className={`bg-white rounded-xl p-2 h-14 flex items-center justify-center text-black border-2 cursor-pointer transition-all ${
+                      selectedMethod?._id === method._id
+                        ? 'border-green-500 scale-105 shadow-lg'
+                        : 'border-transparent hover:border-green-300'
+                    }`}
                   >
                     <div className="w-full h-full flex items-center justify-center">
                       {getMethodIcon(method)}
@@ -407,9 +525,18 @@ export default function DepositPage() {
                         />
                         <label
                           htmlFor="screenshot-upload-manual"
-                          className="block w-full bg-white rounded-xl px-4 py-3 text-center cursor-pointer hover:brightness-110 transition font-medium"
+                          className={`block w-full rounded-xl px-4 py-3 text-center cursor-pointer transition font-medium ${
+                            uploadStatus === 'success' 
+                              ? 'bg-green-600 text-white' 
+                              : uploadStatus === 'error'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-white text-black hover:brightness-110'
+                          }`}
                         >
-                          {field.label}
+                          {uploadStatus === 'uploading' ? 'Uploading...' : 
+                           uploadStatus === 'success' ? 'Upload Successful!' :
+                           uploadStatus === 'error' ? 'Upload Failed. Try Again.' :
+                           field.label}
                         </label>
                         {uploadStatus === 'success' && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -428,10 +555,10 @@ export default function DepositPage() {
                           className="w-full bg-white border-0 rounded-xl px-4 py-3 text-black text-center text-lg placeholder-black focus:outline-none focus:ring-2 focus:ring-green-400"
                         />
                         {/* Bonus indicator for amount field */}
-                        {field.name === 'amount' && calculatedBonus && (
+                        {(field.name === 'amount' || field.name === 'Amount' || field.label.toLowerCase().includes('amount')) && calculatedBonus && (
                           <div className="absolute -bottom-6 left-0 right-0 text-center">
                             <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded-full">
-                              + ৳{calculatedBonus} bonus will be added
+                              + ৳{calculatedBonus.toFixed(2)} bonus will be added
                             </span>
                           </div>
                         )}
@@ -444,12 +571,13 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg"
+                  disabled={submitting}
+                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
                 >
-                  Deposit Now
-                  {calculatedBonus && (
+                  {submitting ? 'Processing...' : 'Deposit Now'}
+                  {calculatedBonus && !submitting && (
                     <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded-full">
-                      +৳{calculatedBonus}
+                      +৳{calculatedBonus.toFixed(2)}
                     </span>
                   )}
                 </button>
@@ -467,11 +595,19 @@ export default function DepositPage() {
                 </p>
               </div>
 
-              {/* Payment Methods for Auto */}
+              {/* Payment Methods for Auto - Make them selectable */}
               {paymentMethods.length > 0 && (
                 <div className="flex justify-center gap-4 mb-4">
                   {paymentMethods.map((method) => (
-                    <div key={method._id} className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center p-1">
+                    <div 
+                      key={method._id} 
+                      onClick={() => setSelectedMethod(method)}
+                      className={`w-24 h-24 rounded-full flex items-center justify-center p-1 cursor-pointer transition-all ${
+                        selectedMethod?._id === method._id
+                          ? 'bg-gradient-to-r from-green-500 to-green-600 scale-105'
+                          : 'bg-white/10 hover:bg-white/20'
+                      }`}
+                    >
                       <div className="w-full h-full bg-white rounded-full flex items-center justify-center p-2">
                         {method.icon ? (
                           <img src={method.icon} alt={method.name} className="w-full h-full object-contain" />
@@ -520,9 +656,9 @@ export default function DepositPage() {
                       required={field.required}
                       className="w-full bg-[#fdfde8] border-0 rounded-xl px-4 py-4 text-black text-center text-xl placeholder-black border-2 border-[#d12d4d] focus:outline-none focus:ring-2 focus:ring-red-400"
                     />
-                    {field.name === 'amount' && calculatedBonus && (
+                    {(field.name === 'amount' || field.name === 'Amount' || field.label.toLowerCase().includes('amount')) && calculatedBonus && (
                       <div className="absolute -bottom-5 left-0 right-0 text-center">
-                        <span className="text-xs text-green-400">+ ৳{calculatedBonus} bonus</span>
+                        <span className="text-xs text-green-400">+ ৳{calculatedBonus.toFixed(2)} bonus</span>
                       </div>
                     )}
                   </div>
@@ -531,12 +667,13 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg"
+                  disabled={submitting}
+                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
                 >
-                  Deposit Now
-                  {calculatedBonus && (
+                  {submitting ? 'Processing...' : 'Deposit Now'}
+                  {calculatedBonus && !submitting && (
                     <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded-full">
-                      +৳{calculatedBonus}
+                      +৳{calculatedBonus.toFixed(2)}
                     </span>
                   )}
                 </button>
@@ -551,10 +688,18 @@ export default function DepositPage() {
 
         {activeTab === "crypto" && (
           <form onSubmit={handleSubmit} className="bg-[#252334] rounded-2xl p-5 border border-gray-800/50">
-            {/* Network Selection */}
+            {/* Network Selection - Make them selectable */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               {paymentMethods.map((method) => (
-                <div key={method._id} className="bg-white rounded-xl p-3 border border-gray-700">
+                <div 
+                  key={method._id} 
+                  onClick={() => setSelectedMethod(method)}
+                  className={`bg-white rounded-xl p-3 border-2 cursor-pointer transition-all ${
+                    selectedMethod?._id === method._id
+                      ? 'border-green-500 scale-105 shadow-lg'
+                      : 'border-gray-700 hover:border-green-300'
+                  }`}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     {method.icon ? (
                       <img src={method.icon} alt={method.name} className="w-12 h-12 rounded" />
@@ -678,9 +823,9 @@ export default function DepositPage() {
                         required={field.required}
                         className="w-full bg-[#fdfde8] border-0 rounded-xl px-4 py-3 text-black border-2 border-[#fc0613] text-center placeholder-black focus:outline-none focus:ring-2 focus:ring-red-400"
                       />
-                      {field.name === 'amount' && calculatedBonus && (
+                      {(field.name === 'amount' || field.name === 'Amount' || field.label.toLowerCase().includes('amount')) && calculatedBonus && (
                         <div className="absolute -bottom-5 left-0 right-0 text-center">
-                          <span className="text-xs text-green-400">+ ৳{calculatedBonus} bonus</span>
+                          <span className="text-xs text-green-400">+ ৳{calculatedBonus.toFixed(2)} bonus</span>
                         </div>
                       )}
                     </div>
@@ -690,12 +835,13 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg"
+                  disabled={submitting}
+                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
                 >
-                  Deposit Now
-                  {calculatedBonus && (
+                  {submitting ? 'Processing...' : 'Deposit Now'}
+                  {calculatedBonus && !submitting && (
                     <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded-full">
-                      +৳{calculatedBonus}
+                      +৳{calculatedBonus.toFixed(2)}
                     </span>
                   )}
                 </button>
@@ -709,72 +855,63 @@ export default function DepositPage() {
         )}
       </div>
 
-      {/* Promotion Details Modal */}
-      {showPromoDetails && selectedPromotion && (
+    
+
+      {/* Success Modal */}
+      {showSuccessModal && submittedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
           <div className="bg-[#252334] rounded-2xl max-w-sm w-full p-5 border border-gray-700">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-white">Bonus Details</h3>
-              <button
-                onClick={() => setShowPromoDetails(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
+            <div className="text-center mb-4">
+              <div className="w-20 h-20 mx-auto bg-green-600 rounded-full flex items-center justify-center mb-3">
+                <CheckCircle className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Request Submitted!</h3>
+              <p className="text-gray-400 text-sm mt-1">
+                Your deposit request has been submitted successfully
+              </p>
             </div>
 
-            <div className="space-y-4">
-              {/* Bonus Icon */}
-              <div className="flex justify-center">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
-                  <Gift className="w-10 h-10 text-white" />
+            <div className="bg-gray-800 rounded-xl p-4 space-y-2 mb-4">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Amount:</span>
+                <span className="text-white font-bold">৳{submittedRequest.amount}</span>
+              </div>
+              {submittedRequest.bonusAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Bonus:</span>
+                  <span className="text-green-400 font-bold">+ ৳{submittedRequest.bonusAmount}</span>
                 </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total:</span>
+                <span className="text-white font-bold">
+                  ৳{submittedRequest.amount + (submittedRequest.bonusAmount || 0)}
+                </span>
               </div>
-
-              {/* Bonus Info */}
-              <div className="text-center">
-                <h4 className="text-2xl font-bold text-white mb-2">{selectedPromotion.bonusName}</h4>
-                <div className="inline-block bg-pink-600/30 px-4 py-2 rounded-full">
-                  <span className="text-3xl font-bold text-pink-400">
-                    {formatBonus(selectedPromotion)}
-                  </span>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Status:</span>
+                <span className="text-yellow-400 font-bold">Pending</span>
               </div>
+            </div>
 
-              {/* Details */}
-              <div className="bg-gray-800 rounded-xl p-4 space-y-3">
-                {selectedPromotion.minDeposit && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Minimum Deposit:</span>
-                    <span className="text-white font-bold">৳{selectedPromotion.minDeposit}</span>
-                  </div>
-                )}
-                {selectedPromotion.maxBonus && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Maximum Bonus:</span>
-                    <span className="text-white font-bold">৳{selectedPromotion.maxBonus}</span>
-                  </div>
-                )}
-                {selectedPromotion.startDate && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Valid From:</span>
-                    <span className="text-white">{new Date(selectedPromotion.startDate).toLocaleDateString()}</span>
-                  </div>
-                )}
-                {selectedPromotion.endDate && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Valid Until:</span>
-                    <span className="text-white">{new Date(selectedPromotion.endDate).toLocaleDateString()}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Button */}
+            <div className="flex gap-3">
               <button
-                onClick={() => setShowPromoDetails(false)}
-                className="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold rounded-xl hover:brightness-110 transition"
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setSubmittedRequest(null);
+                }}
+                className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition"
               >
-                Got it!
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  router.push('/dashboard/deposit-history');
+                }}
+                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:brightness-110 transition"
+              >
+                View History
               </button>
             </div>
           </div>
