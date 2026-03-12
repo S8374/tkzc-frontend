@@ -18,7 +18,8 @@ import {
   Upload,
   Link2,
   CheckCircle,
-  Loader2
+  Loader2,
+  Star
 } from "lucide-react";
 import { depositService } from "@/services/api/deposit.service";
 import { promotionService, Promotion } from "@/services/api/promotion.service";
@@ -55,6 +56,7 @@ interface FormField {
   order: number;
   paymentMethodId?: string;
   isActive: boolean;
+  isBonusField?: boolean;
 }
 
 // Helper function to generate slug from name
@@ -116,7 +118,8 @@ export default function DepositManagement() {
     required: false,
     order: 0,
     paymentMethodId: undefined as string | undefined,
-    isActive: true
+    isActive: true,
+    isBonusField: false
   });
 
   const [promotionForm, setPromotionForm] = useState({
@@ -408,6 +411,15 @@ export default function DepositManagement() {
   // ========== FORM FIELD HANDLERS ==========
   const handleCreateField = async () => {
     try {
+      // Check if trying to create a bonus field when one already exists
+      if (fieldForm.isBonusField) {
+        const existingBonusField = formFields.find(f => f.isBonusField === true);
+        if (existingBonusField) {
+          alert(`A bonus field already exists for this tab. Only one bonus field is allowed.`);
+          return;
+        }
+      }
+
       const fieldData: any = {
         label: fieldForm.label,
         name: fieldForm.name,
@@ -416,7 +428,8 @@ export default function DepositManagement() {
         placeholder: fieldForm.placeholder,
         required: fieldForm.required,
         order: fieldForm.order,
-        isActive: fieldForm.isActive
+        isActive: fieldForm.isActive,
+        isBonusField: fieldForm.isBonusField
       };
 
       if (fieldForm.paymentMethodId && fieldForm.paymentMethodId.trim() !== '') {
@@ -427,15 +440,33 @@ export default function DepositManagement() {
       setShowFieldModal(false);
       resetFieldForm();
       fetchData();
-    } catch (error) {
+      alert("Form field created successfully!");
+    } catch (error: any) {
       console.error("Error creating form field:", error);
-      alert("Failed to create form field");
+      
+      // Check for bonus field validation error
+      if (error.response?.data?.message?.includes("Bonus field already exists")) {
+        alert(error.response.data.message);
+      } else {
+        alert("Failed to create form field. Please try again.");
+      }
     }
   };
 
   const handleUpdateField = async () => {
     if (!editingItem) return;
     try {
+      // Check if trying to make this a bonus field when another bonus field exists
+      if (fieldForm.isBonusField) {
+        const existingBonusField = formFields.find(f => 
+          f.isBonusField === true && f._id !== editingItem._id
+        );
+        if (existingBonusField) {
+          alert(`A bonus field already exists for this tab. Only one bonus field is allowed.`);
+          return;
+        }
+      }
+
       const fieldData: any = {
         label: fieldForm.label,
         name: fieldForm.name,
@@ -443,7 +474,8 @@ export default function DepositManagement() {
         placeholder: fieldForm.placeholder,
         required: fieldForm.required,
         order: fieldForm.order,
-        isActive: fieldForm.isActive
+        isActive: fieldForm.isActive,
+        isBonusField: fieldForm.isBonusField
       };
 
       if (fieldForm.paymentMethodId && fieldForm.paymentMethodId.trim() !== '') {
@@ -455,9 +487,15 @@ export default function DepositManagement() {
       setEditingItem(null);
       resetFieldForm();
       fetchData();
-    } catch (error) {
+      alert("Form field updated successfully!");
+    } catch (error: any) {
       console.error("Error updating form field:", error);
-      alert("Failed to update form field");
+      
+      if (error.response?.data?.message?.includes("Bonus field already exists")) {
+        alert(error.response.data.message);
+      } else {
+        alert("Failed to update form field. Please try again.");
+      }
     }
   };
 
@@ -466,6 +504,7 @@ export default function DepositManagement() {
     try {
       await depositService.deleteFormField(id);
       fetchData();
+      alert("Form field deleted successfully!");
     } catch (error) {
       console.error("Error deleting form field:", error);
       alert("Failed to delete form field");
@@ -497,6 +536,7 @@ export default function DepositManagement() {
       setShowPromotionModal(false);
       resetPromotionForm();
       fetchData();
+      alert("Promotion created successfully!");
     } catch (error) {
       console.error("Error creating promotion:", error);
       alert("Failed to create promotion");
@@ -516,6 +556,7 @@ export default function DepositManagement() {
       setEditingItem(null);
       resetPromotionForm();
       fetchData();
+      alert("Promotion updated successfully!");
     } catch (error) {
       console.error("Error updating promotion:", error);
       alert("Failed to update promotion");
@@ -527,6 +568,7 @@ export default function DepositManagement() {
     try {
       await promotionService.deletePromotion(id);
       fetchData();
+      alert("Promotion deleted successfully!");
     } catch (error) {
       console.error("Error deleting promotion:", error);
       alert("Failed to delete promotion");
@@ -575,7 +617,8 @@ export default function DepositManagement() {
       required: false,
       order: formFields.length,
       paymentMethodId: undefined,
-      isActive: true
+      isActive: true,
+      isBonusField: false
     });
   };
 
@@ -626,7 +669,8 @@ export default function DepositManagement() {
       required: field.required,
       order: field.order,
       paymentMethodId: field.paymentMethodId,
-      isActive: field.isActive
+      isActive: field.isActive,
+      isBonusField: field.isBonusField || false
     });
     setShowFieldModal(true);
   };
@@ -667,6 +711,9 @@ export default function DepositManagement() {
       </div>
     );
   }
+
+  // Check if a bonus field already exists
+  const bonusFieldExists = formFields.some(f => f.isBonusField === true);
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -961,6 +1008,12 @@ export default function DepositManagement() {
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 Form Fields
+                {bonusFieldExists && (
+                  <span className="ml-2 text-xs bg-yellow-600/20 text-yellow-400 px-2 py-1 rounded-full flex items-center gap-1">
+                    <Star className="w-3 h-3" />
+                    Bonus Field Active
+                  </span>
+                )}
               </h2>
               <button
                 onClick={() => {
@@ -991,6 +1044,12 @@ export default function DepositManagement() {
                         {field.required && (
                           <span className="text-xs bg-red-600 px-2 py-1 rounded text-white">
                             Required
+                          </span>
+                        )}
+                        {field.isBonusField && (
+                          <span className="text-xs bg-yellow-600 px-2 py-1 rounded text-white flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            Bonus Field
                           </span>
                         )}
                       </div>
@@ -1040,16 +1099,16 @@ export default function DepositManagement() {
         </div>
       </div>
 
-      {/* Payment Method Modal with Slug Handling */}
+      {/* Payment Method Modal */}
       {showMethodModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-800 pt-2 pb-4 z-10 border-b border-gray-700">
               <h3 className="text-xl font-bold text-white">
                 {editingItem ? 'Edit Payment Method' : 'Add Payment Method'}
               </h3>
-              <button onClick={() => setShowMethodModal(false)}>
-                <X className="w-5 h-5 text-gray-400 hover:text-white" />
+              <button onClick={() => setShowMethodModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1068,7 +1127,6 @@ export default function DepositManagement() {
                     setMethodForm({
                       ...methodForm,
                       name: newName,
-                      // Auto-generate slug only if we're creating new and slug is empty or matches the generated from previous name
                       slug: !editingItem && (!methodForm.slug || methodForm.slug === generateSlug(methodForm.name))
                         ? generateSlug(newName)
                         : methodForm.slug
@@ -1233,8 +1291,8 @@ export default function DepositManagement() {
                 </label>
               </div>
 
-              {/* Form Buttons */}
-              <div className="flex gap-3 pt-4">
+              {/* Form Buttons - Sticky at bottom */}
+              <div className="sticky bottom-0 bg-gray-800 pt-4 pb-2 border-t border-gray-700 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowMethodModal(false)}
@@ -1268,13 +1326,13 @@ export default function DepositManagement() {
       {/* Instruction Modal */}
       {showInstructionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-800 pt-2 pb-4 z-10 border-b border-gray-700">
               <h3 className="text-xl font-bold text-white">
                 {editingItem ? 'Edit Instruction' : 'Add Instruction'}
               </h3>
-              <button onClick={() => setShowInstructionModal(false)}>
-                <X className="w-5 h-5 text-gray-400 hover:text-white" />
+              <button onClick={() => setShowInstructionModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1318,7 +1376,7 @@ export default function DepositManagement() {
                 </label>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="sticky bottom-0 bg-gray-800 pt-4 pb-2 border-t border-gray-700 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowInstructionModal(false)}
@@ -1338,133 +1396,198 @@ export default function DepositManagement() {
         </div>
       )}
 
-      {/* Form Field Modal */}
+      {/* Form Field Modal - Scrollable with Sticky Header and Footer */}
       {showFieldModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-white">
-                {editingItem ? 'Edit Form Field' : 'Add Form Field'}
-              </h3>
-              <button onClick={() => setShowFieldModal(false)}>
-                <X className="w-5 h-5 text-gray-400 hover:text-white" />
-              </button>
+          <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
+            {/* Sticky Header */}
+            <div className="sticky top-0 bg-gray-800 pt-6 px-6 pb-4 z-10 border-b border-gray-700 rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">
+                  {editingItem ? 'Edit Form Field' : 'Add Form Field'}
+                </h3>
+                <button onClick={() => setShowFieldModal(false)} className="text-gray-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              editingItem ? handleUpdateField() : handleCreateField();
-            }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Label *</label>
-                <input
-                  type="text"
-                  value={fieldForm.label}
-                  onChange={(e) => setFieldForm({...fieldForm, label: e.target.value})}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="e.g., Amount"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Field Name *</label>
-                <input
-                  type="text"
-                  value={fieldForm.name}
-                  onChange={(e) => setFieldForm({...fieldForm, name: e.target.value})}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="e.g., amount"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Field Type *</label>
-                <select
-                  value={fieldForm.type}
-                  onChange={(e) => setFieldForm({...fieldForm, type: e.target.value as any})}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  required
-                >
-                  <option value="text">Text</option>
-                  <option value="number">Number</option>
-                  <option value="textarea">Textarea</option>
-                  <option value="screenshot">Screenshot</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Placeholder</label>
-                <input
-                  type="text"
-                  value={fieldForm.placeholder}
-                  onChange={(e) => setFieldForm({...fieldForm, placeholder: e.target.value})}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Order</label>
-                <input
-                  type="number"
-                  value={fieldForm.order}
-                  onChange={(e) => setFieldForm({...fieldForm, order: parseInt(e.target.value) || 0})}
-                  min="0"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                />
-              </div>
-
-              {paymentMethods.length > 0 && (
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <form id="fieldForm" onSubmit={(e) => {
+                e.preventDefault();
+                editingItem ? handleUpdateField() : handleCreateField();
+              }} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Link to Payment Method (Optional)
-                  </label>
-                  <select
-                    value={fieldForm.paymentMethodId || ''}
-                    onChange={(e) => setFieldForm({
-                      ...fieldForm, 
-                      paymentMethodId: e.target.value || undefined
-                    })}
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Label *</label>
+                  <input
+                    type="text"
+                    value={fieldForm.label}
+                    onChange={(e) => setFieldForm({...fieldForm, label: e.target.value})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    placeholder="e.g., Amount"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Field Name *</label>
+                  <input
+                    type="text"
+                    value={fieldForm.name}
+                    onChange={(e) => {
+                      // Auto-generate field name from label if empty
+                      const newName = e.target.value || fieldForm.label.toLowerCase().replace(/\s+/g, '_');
+                      setFieldForm({...fieldForm, name: newName});
+                    }}
+                    onBlur={(e) => {
+                      // Auto-fill name from label if name is empty
+                      if (!fieldForm.name && fieldForm.label) {
+                        const generatedName = fieldForm.label
+                          .toLowerCase()
+                          .replace(/\s+/g, '_')
+                          .replace(/[^a-z0-9_]/g, '');
+                        setFieldForm({...fieldForm, name: generatedName});
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    placeholder="e.g., amount (auto-generated from label)"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Will be used as the field name in database
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Field Type *</label>
+                  <select
+                    value={fieldForm.type}
+                    onChange={(e) => setFieldForm({...fieldForm, type: e.target.value as any})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    required
                   >
-                    <option value="">None</option>
-                    {paymentMethods.map((method) => (
-                      <option key={method._id} value={method._id}>
-                        {method.name}
-                      </option>
-                    ))}
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="textarea">Textarea</option>
+                    <option value="screenshot">Screenshot</option>
                   </select>
                 </div>
-              )}
 
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="fieldRequired"
-                  checked={fieldForm.required}
-                  onChange={(e) => setFieldForm({...fieldForm, required: e.target.checked})}
-                  className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
-                />
-                <label htmlFor="fieldRequired" className="ml-2 text-sm text-gray-300">
-                  Required Field
-                </label>
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Placeholder</label>
+                  <input
+                    type="text"
+                    value={fieldForm.placeholder}
+                    onChange={(e) => setFieldForm({...fieldForm, placeholder: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                  />
+                </div>
 
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="fieldActive"
-                  checked={fieldForm.isActive}
-                  onChange={(e) => setFieldForm({...fieldForm, isActive: e.target.checked})}
-                  className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
-                />
-                <label htmlFor="fieldActive" className="ml-2 text-sm text-gray-300">
-                  Active
-                </label>
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Order</label>
+                  <input
+                    type="number"
+                    value={fieldForm.order}
+                    onChange={(e) => setFieldForm({...fieldForm, order: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    min="0"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Lower numbers appear first
+                  </p>
+                </div>
 
-              <div className="flex gap-3 pt-4">
+                {paymentMethods.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Link to Payment Method (Optional)
+                    </label>
+                    <select
+                      value={fieldForm.paymentMethodId || ''}
+                      onChange={(e) => setFieldForm({
+                        ...fieldForm, 
+                        paymentMethodId: e.target.value || undefined
+                      })}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    >
+                      <option value="">None (Applies to all methods)</option>
+                      {paymentMethods.map((method) => (
+                        <option key={method._id} value={method._id}>
+                          {method.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      If linked, this field will only show for this payment method
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="fieldRequired"
+                    checked={fieldForm.required}
+                    onChange={(e) => setFieldForm({...fieldForm, required: e.target.checked})}
+                    className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
+                  />
+                  <label htmlFor="fieldRequired" className="ml-2 text-sm text-gray-300">
+                    Required Field
+                  </label>
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="fieldActive"
+                    checked={fieldForm.isActive}
+                    onChange={(e) => setFieldForm({...fieldForm, isActive: e.target.checked})}
+                    className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
+                  />
+                  <label htmlFor="fieldActive" className="ml-2 text-sm text-gray-300">
+                    Active
+                  </label>
+                </div>
+
+                {/* Bonus Field Checkbox */}
+                <div className="flex items-center border-t border-gray-700 pt-3 mt-2">
+                  <input
+                    type="checkbox"
+                    id="isBonusField"
+                    checked={fieldForm.isBonusField}
+                    onChange={(e) => {
+                      // Warn if trying to set bonus field when one already exists
+                      if (e.target.checked && bonusFieldExists && !editingItem) {
+                        if (!confirm("A bonus field already exists. Setting this as bonus field will replace the existing one. Continue?")) {
+                          return;
+                        }
+                      }
+                      setFieldForm({...fieldForm, isBonusField: e.target.checked});
+                    }}
+                    className="h-4 w-4 text-yellow-500 rounded bg-gray-700 border-gray-600"
+                  />
+                  <label htmlFor="isBonusField" className="ml-2 text-sm text-gray-300 flex items-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Bonus Field
+                  </label>
+                  {bonusFieldExists && !editingItem && (
+                    <p className="text-xs text-yellow-500 ml-2">
+                      (One already exists)
+                    </p>
+                  )}
+                </div>
+                {fieldForm.isBonusField && (
+                  <p className="text-xs text-yellow-400 mt-1">
+                    ⚠️ This field will be used for bonus calculations. Only one bonus field per tab is allowed.
+                  </p>
+                )}
+              </form>
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 bg-gray-800 px-6 py-4 border-t border-gray-700 rounded-b-lg">
+              <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowFieldModal(false)}
@@ -1474,267 +1597,277 @@ export default function DepositManagement() {
                 </button>
                 <button
                   type="submit"
+                  form="fieldForm"
                   className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
                 >
                   {editingItem ? 'Update' : 'Create'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Promotion Modal with Icon Upload */}
+      {/* Promotion Modal */}
       {showPromotionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-white">
-                {editingItem ? 'Edit Promotion' : 'Add New Promotion'}
-              </h3>
-              <button onClick={() => setShowPromotionModal(false)}>
-                <X className="w-5 h-5 text-gray-400 hover:text-white" />
-              </button>
+          <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
+            {/* Sticky Header */}
+            <div className="sticky top-0 bg-gray-800 pt-6 px-6 pb-4 z-10 border-b border-gray-700 rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">
+                  {editingItem ? 'Edit Promotion' : 'Add New Promotion'}
+                </h3>
+                <button onClick={() => setShowPromotionModal(false)} className="text-gray-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              editingItem ? handleUpdatePromotion() : handleCreatePromotion();
-            }} className="space-y-4">
-              {/* Bonus Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Bonus Name *</label>
-                <input
-                  type="text"
-                  value={promotionForm.bonusName}
-                  onChange={(e) => setPromotionForm({...promotionForm, bonusName: e.target.value})}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="e.g., Eid Bonus, Welcome Bonus"
-                  required
-                />
-              </div>
-
-              {/* Bonus Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Bonus Type *</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label
-                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      promotionForm.type === 'PERCENT'
-                        ? 'bg-blue-600/20 border-blue-500'
-                        : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="type"
-                      value="PERCENT"
-                      checked={promotionForm.type === 'PERCENT'}
-                      onChange={(e) => setPromotionForm({...promotionForm, type: e.target.value as 'PERCENT'})}
-                      className="hidden"
-                    />
-                    <Percent className="w-4 h-4 text-blue-400" />
-                    <span className="text-white">Percentage</span>
-                  </label>
-
-                  <label
-                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      promotionForm.type === 'FIXED'
-                        ? 'bg-blue-600/20 border-blue-500'
-                        : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="type"
-                      value="FIXED"
-                      checked={promotionForm.type === 'FIXED'}
-                      onChange={(e) => setPromotionForm({...promotionForm, type: e.target.value as 'FIXED'})}
-                      className="hidden"
-                    />
-                    <DollarSign className="w-4 h-4 text-green-400" />
-                    <span className="text-white">Fixed Amount</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Value */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  {promotionForm.type === 'PERCENT' ? 'Percentage Value *' : 'Fixed Amount (BDT) *'}
-                </label>
-                <div className="relative">
-                  {promotionForm.type === 'PERCENT' ? (
-                    <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  ) : (
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  )}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <form id="promotionForm" onSubmit={(e) => {
+                e.preventDefault();
+                editingItem ? handleUpdatePromotion() : handleCreatePromotion();
+              }} className="space-y-4">
+                {/* Bonus Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Bonus Name *</label>
                   <input
-                    type="number"
-                    value={promotionForm.value}
-                    onChange={(e) => setPromotionForm({...promotionForm, value: parseFloat(e.target.value) || 0})}
-                    className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                    placeholder={promotionForm.type === 'PERCENT' ? "e.g., 10" : "e.g., 50"}
-                    min="0"
-                    step={promotionForm.type === 'PERCENT' ? "0.1" : "1"}
+                    type="text"
+                    value={promotionForm.bonusName}
+                    onChange={(e) => setPromotionForm({...promotionForm, bonusName: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    placeholder="e.g., Eid Bonus, Welcome Bonus"
                     required
                   />
                 </div>
-              </div>
 
-              {/* Min Deposit */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Minimum Deposit (Optional)
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="number"
-                    value={promotionForm.minDeposit || ''}
-                    onChange={(e) => setPromotionForm({
-                      ...promotionForm, 
-                      minDeposit: e.target.value ? parseFloat(e.target.value) : undefined
-                    })}
-                    className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                    placeholder="e.g., 500"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              {/* Icon Upload Section */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Promotion Icon (Optional)
-                </label>
-                <div className="space-y-3">
-                  {/* Upload Area */}
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePromoIconUpload}
-                      className="hidden"
-                      id="promotion-icon-upload"
-                      disabled={uploadingPromoIcon}
-                    />
+                {/* Bonus Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Bonus Type *</label>
+                  <div className="grid grid-cols-2 gap-3">
                     <label
-                      htmlFor="promotion-icon-upload"
-                      className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${
-                        promoIconUploadStatus === 'success' 
-                          ? 'border-green-500 bg-green-500/10' 
-                          : promoIconUploadStatus === 'error'
-                          ? 'border-red-500 bg-red-500/10'
-                          : 'border-gray-600 hover:border-pink-500 bg-gray-700/50'
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        promotionForm.type === 'PERCENT'
+                          ? 'bg-blue-600/20 border-blue-500'
+                          : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
                       }`}
                     >
-                      <div className="text-center">
-                        {uploadingPromoIcon ? (
-                          <>
-                            <Loader2 className="w-8 h-8 mx-auto mb-2 text-pink-400 animate-spin" />
-                            <p className="text-sm text-gray-300">Uploading...</p>
-                          </>
-                        ) : promoIconUploadStatus === 'success' ? (
-                          <>
-                            <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
-                            <p className="text-sm text-green-400">Upload Successful!</p>
-                          </>
-                        ) : promoIconUploadStatus === 'error' ? (
-                          <>
-                            <X className="w-8 h-8 mx-auto mb-2 text-red-500" />
-                            <p className="text-sm text-red-400">Upload Failed. Try again.</p>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                            <p className="text-sm text-gray-300">Click to upload icon</p>
-                            <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
-                          </>
-                        )}
-                      </div>
+                      <input
+                        type="radio"
+                        name="type"
+                        value="PERCENT"
+                        checked={promotionForm.type === 'PERCENT'}
+                        onChange={(e) => setPromotionForm({...promotionForm, type: e.target.value as 'PERCENT'})}
+                        className="hidden"
+                      />
+                      <Percent className="w-4 h-4 text-blue-400" />
+                      <span className="text-white">Percentage</span>
+                    </label>
+
+                    <label
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        promotionForm.type === 'FIXED'
+                          ? 'bg-blue-600/20 border-blue-500'
+                          : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="type"
+                        value="FIXED"
+                        checked={promotionForm.type === 'FIXED'}
+                        onChange={(e) => setPromotionForm({...promotionForm, type: e.target.value as 'FIXED'})}
+                        className="hidden"
+                      />
+                      <DollarSign className="w-4 h-4 text-green-400" />
+                      <span className="text-white">Fixed Amount</span>
                     </label>
                   </div>
+                </div>
 
-                  {/* Preview or URL Input */}
-                  {promotionForm.iconUrl && (
-                    <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
-                      <img 
-                        src={promotionForm.iconUrl} 
-                        alt="Icon preview" 
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-400 truncate">{promotionForm.iconUrl}</p>
-                        <button
-                          type="button"
-                          onClick={() => setPromotionForm({...promotionForm, iconUrl: ''})}
-                          className="text-xs text-red-400 hover:text-red-300 mt-1"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Manual URL Input */}
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1">
-                      <Link2 className="w-3 h-3" />
-                      Or enter icon URL manually
-                    </label>
+                {/* Value */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    {promotionForm.type === 'PERCENT' ? 'Percentage Value *' : 'Fixed Amount (BDT) *'}
+                  </label>
+                  <div className="relative">
+                    {promotionForm.type === 'PERCENT' ? (
+                      <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    ) : (
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    )}
                     <input
-                      type="url"
-                      value={promotionForm.iconUrl}
-                      onChange={(e) => setPromotionForm({...promotionForm, iconUrl: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                      placeholder="https://example.com/icon.png"
+                      type="number"
+                      value={promotionForm.value}
+                      onChange={(e) => setPromotionForm({...promotionForm, value: parseFloat(e.target.value) || 0})}
+                      className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      placeholder={promotionForm.type === 'PERCENT' ? "e.g., 10" : "e.g., 50"}
+                      min="0"
+                      step={promotionForm.type === 'PERCENT' ? "0.1" : "1"}
+                      required
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-3">
+                {/* Min Deposit */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Start Date
+                    Minimum Deposit (Optional)
                   </label>
-                  <input
-                    type="date"
-                    value={promotionForm.startDate}
-                    onChange={(e) => setPromotionForm({...promotionForm, startDate: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      value={promotionForm.minDeposit || ''}
+                      onChange={(e) => setPromotionForm({
+                        ...promotionForm, 
+                        minDeposit: e.target.value ? parseFloat(e.target.value) : undefined
+                      })}
+                      className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      placeholder="e.g., 500"
+                      min="0"
+                    />
+                  </div>
                 </div>
+
+                {/* Icon Upload Section */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    End Date
+                    Promotion Icon (Optional)
                   </label>
-                  <input
-                    type="date"
-                    value={promotionForm.endDate}
-                    onChange={(e) => setPromotionForm({...promotionForm, endDate: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                  <div className="space-y-3">
+                    {/* Upload Area */}
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePromoIconUpload}
+                        className="hidden"
+                        id="promotion-icon-upload"
+                        disabled={uploadingPromoIcon}
+                      />
+                      <label
+                        htmlFor="promotion-icon-upload"
+                        className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${
+                          promoIconUploadStatus === 'success' 
+                            ? 'border-green-500 bg-green-500/10' 
+                            : promoIconUploadStatus === 'error'
+                            ? 'border-red-500 bg-red-500/10'
+                            : 'border-gray-600 hover:border-pink-500 bg-gray-700/50'
+                        }`}
+                      >
+                        <div className="text-center">
+                          {uploadingPromoIcon ? (
+                            <>
+                              <Loader2 className="w-8 h-8 mx-auto mb-2 text-pink-400 animate-spin" />
+                              <p className="text-sm text-gray-300">Uploading...</p>
+                            </>
+                          ) : promoIconUploadStatus === 'success' ? (
+                            <>
+                              <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                              <p className="text-sm text-green-400">Upload Successful!</p>
+                            </>
+                          ) : promoIconUploadStatus === 'error' ? (
+                            <>
+                              <X className="w-8 h-8 mx-auto mb-2 text-red-500" />
+                              <p className="text-sm text-red-400">Upload Failed. Try again.</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                              <p className="text-sm text-gray-300">Click to upload icon</p>
+                              <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                            </>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Preview or URL Input */}
+                    {promotionForm.iconUrl && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
+                        <img 
+                          src={promotionForm.iconUrl} 
+                          alt="Icon preview" 
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-400 truncate">{promotionForm.iconUrl}</p>
+                          <button
+                            type="button"
+                            onClick={() => setPromotionForm({...promotionForm, iconUrl: ''})}
+                            className="text-xs text-red-400 hover:text-red-300 mt-1"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Manual URL Input */}
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1">
+                        <Link2 className="w-3 h-3" />
+                        Or enter icon URL manually
+                      </label>
+                      <input
+                        type="url"
+                        value={promotionForm.iconUrl}
+                        onChange={(e) => setPromotionForm({...promotionForm, iconUrl: e.target.value})}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        placeholder="https://example.com/icon.png"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Active Status */}
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="promotionActive"
-                  checked={promotionForm.isActive}
-                  onChange={(e) => setPromotionForm({...promotionForm, isActive: e.target.checked})}
-                  className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
-                />
-                <label htmlFor="promotionActive" className="ml-2 text-sm text-gray-300">
-                  Active
-                </label>
-              </div>
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={promotionForm.startDate}
+                      onChange={(e) => setPromotionForm({...promotionForm, startDate: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={promotionForm.endDate}
+                      onChange={(e) => setPromotionForm({...promotionForm, endDate: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    />
+                  </div>
+                </div>
 
-              <div className="flex gap-3 pt-4">
+                {/* Active Status */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="promotionActive"
+                    checked={promotionForm.isActive}
+                    onChange={(e) => setPromotionForm({...promotionForm, isActive: e.target.checked})}
+                    className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
+                  />
+                  <label htmlFor="promotionActive" className="ml-2 text-sm text-gray-300">
+                    Active
+                  </label>
+                </div>
+              </form>
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 bg-gray-800 px-6 py-4 border-t border-gray-700 rounded-b-lg">
+              <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowPromotionModal(false)}
@@ -1744,6 +1877,7 @@ export default function DepositManagement() {
                 </button>
                 <button
                   type="submit"
+                  form="promotionForm"
                   disabled={uploadingPromoIcon}
                   className="flex-1 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
                 >
@@ -1760,7 +1894,7 @@ export default function DepositManagement() {
                   )}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
