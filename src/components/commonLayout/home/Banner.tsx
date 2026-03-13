@@ -35,7 +35,7 @@ export default function Banner() {
   const [slides, setSlides] = useState<Slider[]>([]);
   const [marquees, setMarquees] = useState<MarqueeItem[]>([]);
   const [loading, setLoading] = useState(true);
-
+ console.log("marquees:", marquees);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -76,7 +76,7 @@ export default function Banner() {
 
   // Combine all active marquee texts
   const marqueeText = marquees.map(m => m.text).join(" • ");
-
+  console.log("marqueeText:", marqueeText);
   if (loading) {
     return (
       <div className="relative rounded-xl overflow-hidden">
@@ -90,7 +90,7 @@ export default function Banner() {
     <div className="relative rounded-xl overflow-hidden">
       {/* Marquee - Only show if there are active marquees */}
       {marquees.length > 0 && (
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600">
+        <div className="bg-chart-4/30 ">
           <div className="p-2 flex items-center">
             <Megaphone className="text-white mr-2 ml-2" size={20} />
             <Marquee 
@@ -120,7 +120,7 @@ export default function Banner() {
             <SwiperSlide key={slide._id}>
               {/* Background */}
               <div
-                className="absolute inset-0 bg-cover bg-center"
+                className="absolute inset-0 bg-cover bg-center rounded-none"
                 style={{ backgroundImage: `url(${slide.image})` }}
                 data-swiper-parallax="-30%"
               />

@@ -144,7 +144,7 @@ const Header = () => {
                           : "hover:bg-accent/60"
                       }`}
                     >
-                      <span className="text-xl">{lang.flag}</span>
+                      {/* <span className="text-xl">{lang.flag}</span> */}
                       <span>{lang.name}</span>
                       {currentLanguage === lang.code && (
                         <span className="ml-auto text-xs text-green-400">✓</span>

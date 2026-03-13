@@ -51,6 +51,7 @@ const CreateSliderTypePage = () => {
         { id: "lottory", label: "Lottory", icon: "🎲" },
         { id: "sport", label: "Sport", icon: "⚽" },
         { id: "table-game", label: "Table Game", icon: "🎯" },
+        { id: "promotion", label: "Promotion", icon: "🎯" },
     ];
 
     const validateField = (name: string, value: string) => {

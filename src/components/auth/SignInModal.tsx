@@ -6,16 +6,22 @@ import { authService } from "@/services/api/auth.services";
 import ReCAPTCHA from "react-google-recaptcha";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface SignInModalProps {
   isOpen: boolean;
   onClose: () => void;
-    onLoginSuccess: () => void; // ✅ ADD THIS
-
+  onLoginSuccess: () => void;
+  onSwitchToRegister?: () => void; // Add this prop
 }
 
-export default function SignInModal({ isOpen, onClose,  onLoginSuccess
- }: SignInModalProps) {
+export default function SignInModal({ 
+  isOpen, 
+  onClose, 
+  onLoginSuccess,
+  onSwitchToRegister 
+}: SignInModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -51,33 +57,40 @@ export default function SignInModal({ isOpen, onClose,  onLoginSuccess
 
   if (!isOpen) return null;
 
-const handleLogin = async () => {
-  if (!username || !password)
-    return toast.error("All fields are required");
-  if (!imHuman)
-    return toast.error("Please verify you are human");
+  const handleLogin = async () => {
+    if (!username || !password)
+      return toast.error(t('auth.allFieldsRequired', 'All fields are required'));
+    if (!imHuman)
+      return toast.error(t('auth.verifyHuman', 'Please verify you are human'));
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const res = await authService.login({
-      identifier: username,
-      password,
-      imHuman,
-    });
+      const res = await authService.login({
+        identifier: username,
+        password,
+        imHuman,
+      });
 
-    if (res?.success) {
-      onLoginSuccess();  // 🔥 THIS updates Header instantly
-      onClose();
-      router.push("/deposit");
-      toast.success("Login successful 🎉");
+      if (res?.success) {
+        onLoginSuccess();
+        onClose();
+        router.push("/deposit");
+        toast.success(t('auth.loginSuccess', 'Login successful 🎉'));
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || t('auth.loginFailed', 'Login failed'));
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    toast.error(err?.response?.data?.message || "Login failed");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
+  const handleRegisterClick = () => {
+    onClose(); // Close sign in modal
+    if (onSwitchToRegister) {
+      onSwitchToRegister(); // Open register modal
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
@@ -94,12 +107,15 @@ const handleLogin = async () => {
         {/* Header */}
         <div className="relative h-28">
           <div className="absolute inset-0 flex flex-col justify-center px-5">
-            <h2 className="text-2xl font-bold text-white">Welcome Sign In</h2>
+            <h2 className="text-2xl font-bold text-white">{t('auth.welcomeSignIn', 'Welcome Sign In')}</h2>
             <p className="text-gray-200 text-sm mt-1">
-              No account yet?{" "}
-              <span className="text-yellow-300 hover:underline cursor-pointer">
-                Register now
-              </span>
+              {t('auth.noAccount', 'No account yet?')}{" "}
+              <button 
+                onClick={handleRegisterClick}
+                className="text-yellow-300 hover:underline cursor-pointer bg-transparent border-none p-0"
+              >
+                {t('auth.registerNow', 'Register now')}
+              </button>
             </p>
           </div>
         </div>
@@ -113,7 +129,7 @@ const handleLogin = async () => {
             </span>
             <input
               type="text"
-              placeholder="Enter username"
+              placeholder={t('auth.enterUsername', 'Enter username')}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-lg
@@ -130,7 +146,7 @@ const handleLogin = async () => {
             </span>
             <input
               type="password"
-              placeholder="Enter password"
+              placeholder={t('auth.enterPassword', 'Enter password')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-lg
@@ -147,7 +163,7 @@ const handleLogin = async () => {
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
               )}
             </div>
-            <span className="text-gray-300">I am human</span>
+            <span className="text-gray-300">{t('auth.iAmHuman', 'I am human')}</span>
           </div>
 
           {/* CAPTCHA */}
@@ -157,7 +173,7 @@ const handleLogin = async () => {
                 sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY as string}
                 onChange={() => {
                   setImHuman(true);
-                  toast.success("Human verified ✅");
+                  toast.success(t('auth.humanVerified', 'Human verified ✅'));
                 }}
               />
             </div>
@@ -171,7 +187,7 @@ const handleLogin = async () => {
                        bg-gradient-to-r from-yellow-500 to-orange-600
                        hover:opacity-90 transition"
           >
-            {loading ? "Signing in..." : "SIGN IN"}
+            {loading ? t('auth.signingIn', 'Signing in...') : t('auth.signIn', 'SIGN IN')}
           </button>
         </div>
 

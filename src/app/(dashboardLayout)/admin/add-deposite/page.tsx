@@ -1101,7 +1101,7 @@ export default function DepositManagement() {
 
       {/* Payment Method Modal */}
       {showMethodModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-800 pt-2 pb-4 z-10 border-b border-gray-700">
               <h3 className="text-xl font-bold text-white">
@@ -1325,7 +1325,7 @@ export default function DepositManagement() {
 
       {/* Instruction Modal */}
       {showInstructionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-800 pt-2 pb-4 z-10 border-b border-gray-700">
               <h3 className="text-xl font-bold text-white">
@@ -1398,7 +1398,7 @@ export default function DepositManagement() {
 
       {/* Form Field Modal - Scrollable with Sticky Header and Footer */}
       {showFieldModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
             {/* Sticky Header */}
             <div className="sticky top-0 bg-gray-800 pt-6 px-6 pb-4 z-10 border-b border-gray-700 rounded-t-lg">
@@ -1610,7 +1610,7 @@ export default function DepositManagement() {
 
       {/* Promotion Modal */}
       {showPromotionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
             {/* Sticky Header */}
             <div className="sticky top-0 bg-gray-800 pt-6 px-6 pb-4 z-10 border-b border-gray-700 rounded-t-lg">

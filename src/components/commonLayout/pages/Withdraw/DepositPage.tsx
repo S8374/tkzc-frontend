@@ -17,7 +17,8 @@ import {
   Hash,
   User as UserIcon,
   Mail,
-  FileText
+  FileText,
+  Star
 } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { depositService } from "@/services/api/deposit.service";
@@ -56,6 +57,7 @@ interface FormField {
   required: boolean;
   order: number;
   isActive: boolean;
+  isBonusField?: boolean; // Add this field
 }
 
 export default function DepositPage() {
@@ -73,6 +75,7 @@ export default function DepositPage() {
   const [minDepositAmount, setMinDepositAmount] = useState<number | null>(null);
   const [amountFieldName, setAmountFieldName] = useState<string>("");
   const [amountField, setAmountField] = useState<FormField | null>(null);
+  const [bonusField, setBonusField] = useState<FormField | null>(null);
 
   // Form state - will store all form field values dynamically
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -99,6 +102,7 @@ export default function DepositPage() {
     setUploadedFileUrl("");
     setAmountFieldName("");
     setAmountField(null);
+    setBonusField(null);
     setFormData({});
   }, [activeTab]);
 
@@ -107,40 +111,38 @@ export default function DepositPage() {
     fetchTabData();
   }, [activeTab]);
 
-  // Find the amount field whenever form fields change
+  // Find the amount field and bonus field whenever form fields change
   useEffect(() => {
     if (formFields.length > 0) {
       console.log("All form fields:", formFields);
       
-      // Try to find the amount field by checking common patterns
-      let foundField = null;
-      
-      // First try: look for field with type 'number' that might be for amount
-      const numberFields = formFields.filter(f => f.type === 'number');
-      
-      // Look for field with "amount" in name or label
-      foundField = formFields.find(f => 
-        f.name.toLowerCase().includes('amount') || 
-        f.label.toLowerCase().includes('amount') ||
-        f.name === 'Amount' ||
-        f.name === 'ammount' ||
+      // Find amount field - check for "Amount" exactly or includes amount
+      const amountField = formFields.find(f => 
+        f.name === 'Amount' || 
         f.name.toLowerCase() === 'amount' ||
-        f.label.toLowerCase().includes('enter amount') ||
-        f.label.toLowerCase().includes('your amount')
+        f.label.toLowerCase().includes('amount') ||
+        f.name.toLowerCase().includes('amount')
       );
       
-      // If not found by pattern, use the first number field
-      if (!foundField && numberFields.length > 0) {
-        foundField = numberFields[0];
-        console.log("Using first number field as amount:", foundField.name);
-      }
-      
-      if (foundField) {
-        setAmountFieldName(foundField.name);
-        setAmountField(foundField);
-        console.log("Amount field identified:", foundField.name);
+      if (amountField) {
+        setAmountFieldName(amountField.name);
+        setAmountField(amountField);
+        console.log("Amount field identified:", amountField.name);
       } else {
-        console.log("No amount field identified in form fields");
+        // If no amount field found, try first number field
+        const numberField = formFields.find(f => f.type === 'number');
+        if (numberField) {
+          setAmountFieldName(numberField.name);
+          setAmountField(numberField);
+          console.log("Using first number field as amount:", numberField.name);
+        }
+      }
+
+      // Find bonus field (marked with isBonusField)
+      const bonusField = formFields.find(f => f.isBonusField === true);
+      if (bonusField) {
+        setBonusField(bonusField);
+        console.log("Bonus field identified:", bonusField.name);
       }
     }
   }, [formFields]);
@@ -277,6 +279,7 @@ export default function DepositPage() {
     setAmountError(null);
     setAmountFieldName("");
     setAmountField(null);
+    setBonusField(null);
   };
 
   const copyAddress = () => {
@@ -320,8 +323,12 @@ export default function DepositPage() {
     console.log("Submitting form with data:", formData);
     console.log("All form fields:", formFields);
     
-    // Find the amount field
-    const amountFieldObj = amountField || formFields.find(f => f.name === amountFieldName);
+    // Find the amount field - use the one we identified or try to find it
+    const amountFieldObj = amountField || formFields.find(f => 
+      f.name === 'Amount' || 
+      f.name.toLowerCase() === 'amount' ||
+      f.label.toLowerCase().includes('amount')
+    );
     
     // Check if amount is valid
     let amount = 0;
@@ -465,6 +472,7 @@ export default function DepositPage() {
 
   // Get appropriate icon for field type
   const getFieldIcon = (field: FormField) => {
+    if (field.isBonusField) return <Star className="w-4 h-4 text-yellow-500" />;
     if (field.type === 'number') return <Hash className="w-4 h-4 text-gray-400" />;
     if (field.type === 'textarea') return <FileText className="w-4 h-4 text-gray-400" />;
     if (field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('sender')) 
@@ -529,7 +537,7 @@ export default function DepositPage() {
         <BackButton />
         <h1 className="text-xl font-bold flex-1 text-center">Deposit</h1>
         <button
-          onClick={() => router.push("/dashboard/deposit-history")}
+          onClick={() => router.push("/history")}
           className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center hover:bg-black/50"
           title="View History"
         >
@@ -778,6 +786,15 @@ export default function DepositPage() {
                             </span>
                           </div>
                         )}
+                        {/* Bonus field indicator */}
+                        {field.isBonusField && (
+                          <div className="absolute -top-3 right-0">
+                            <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Star className="w-3 h-3" />
+                              Bonus
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -893,6 +910,14 @@ export default function DepositPage() {
                         <span className="text-xs text-red-400">{amountError}</span>
                       </div>
                     )}
+                    {field.isBonusField && (
+                      <div className="absolute -top-3 right-0">
+                        <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Star className="w-3 h-3" />
+                          Bonus
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -1001,6 +1026,14 @@ export default function DepositPage() {
                           required={field.required}
                           className="w-full bg-gradient-to-r from-red-500 to-red-600 border-0 rounded-xl pl-10 pr-4 py-3 text-white text-center border-2 border-[#fc0613] placeholder-white/80"
                         />
+                        {field.isBonusField && (
+                          <div className="absolute -top-3 right-0">
+                            <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Star className="w-3 h-3" />
+                              Bonus
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -1045,6 +1078,14 @@ export default function DepositPage() {
                               <Upload className="w-5 h-5 text-white" />
                             </div>
                           </label>
+                          {field.isBonusField && (
+                            <div className="absolute -top-3 right-0">
+                              <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Star className="w-3 h-3" />
+                                Bonus
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1078,6 +1119,14 @@ export default function DepositPage() {
                       {field.name === amountFieldName && amountError && (
                         <div className="absolute -bottom-5 left-0 right-0 text-center">
                           <span className="text-xs text-red-400">{amountError}</span>
+                        </div>
+                      )}
+                      {field.isBonusField && (
+                        <div className="absolute -top-3 right-0">
+                          <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            Bonus
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1157,7 +1206,7 @@ export default function DepositPage() {
               <button
                 onClick={() => {
                   setShowSuccessModal(false);
-                  router.push('/dashboard/deposit-history');
+                  router.push('/history');
                 }}
                 className="flex-1 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:brightness-110 transition"
               >

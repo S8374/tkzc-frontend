@@ -1,66 +1,79 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
-// components/commonLayout/footer/PartnerMarquee.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-
-// Real logo URLs (from your example + others)
-const PARTNERS = [
-  { id: "evolution", name: "Evolution Gaming", src: "https://tkzc668.com/static/img/provider_evolution.8f2e3b1a.png" },
-  { id: "good-fortune", name: "Good Fortune Gaming", src: "https://tkzc668.com/static/img/provider_gfg.5c9d2a3f.png" },
-  { id: "pg", name: "PG SOFT", src: "https://tkzc668.com/static/img/provider_pg.140b8ae6.png" }, // ✅ your image
-  { id: "pragmatic", name: "Pragmatic Play", src: "https://tkzc668.com/static/img/provider_pragmatic.7d1e4c2b.png" },
-  { id: "playtech", name: "Playtech", src: "https://tkzc668.com/static/img/provider_playtech.9a3b1f0d.png" },
-  { id: "netent", name: "NetEnt", src: "https://tkzc668.com/static/img/provider_netent.2e4f6a8c.png" },
-  { id: "jili", name: "JILI", src: "https://tkzc668.com/static/img/provider_jili.d4f1a2e3.png" },
-  { id: "cq9", name: "CQ9", src: "https://tkzc668.com/static/img/provider_cq9.6b7c8d9e.png" },
-];
+import { partnerService, Partner } from "@/services/api/partner.service";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function PartnerMarquee() {
+  const { t } = useTranslation();
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    fetchPartners();
   }, []);
 
+  const fetchPartners = async () => {
+    try {
+      setLoading(true);
+      const response = await partnerService.getActivePartners();
+      if (response?.success) {
+        setPartners(response.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch partners:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isMounted) return null;
+  if (loading) {
+    return (
+      <div className="bg-[#3B393A] py-6">
+        <div className="max-w-6xl mx-auto px-4">
+          <h3 className="text-start text-white font-semibold mb-4">
+            {t('partners.title', 'Partners and Industry Associations')}
+          </h3>
+          <div className="flex justify-center items-center h-20">
+            <div className="w-8 h-8 border-4 border-gray-600 border-t-white rounded-full animate-spin"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (partners.length === 0) return null;
 
   return (
     <div className="bg-[#3B393A] py-6">
       <div className="max-w-6xl mx-auto px-4">
-        <h3 className="text-start text-white font-semibold mb-4">Partners and Industry Associations</h3>
+        <h3 className="text-start text-white font-semibold mb-4">
+          {t('partners.title', 'Partners and Industry Associations')}
+        </h3>
 
         {/* Smooth CSS Marquee */}
         <div className="overflow-hidden">
           <div 
             className="flex animate-marquee whitespace-nowrap"
             style={{
-              animationDuration: "25s", // slower = smoother; adjust based on #items
+              animationDuration: `${Math.max(20, partners.length * 3)}s`,
             }}
           >
             {/* First copy */}
-            {PARTNERS.map((p) => (
-              <div key={`orig-${p.id}`} className="flex-shrink-0 mx-6">
+            {partners.map((partner) => (
+              <div key={`orig-${partner._id}`} className="flex-shrink-0 mx-6">
                 <img
-                  src={p.src}
-                  alt={p.name}
+                  src={partner.logo}
+                  alt={partner.name}
                   className="h-10 object-contain opacity-80 hover:opacity-100 transition-opacity duration-300"
                   loading="lazy"
                 />
               </div>
             ))}
-            {/* Second copy for seamless loop */}
-            {PARTNERS.map((p) => (
-              <div key={`copy-${p.id}`} className="flex-shrink-0 mx-6">
-                <img
-                  src={p.src}
-                  alt={p.name}
-                  className="h-10 object-contain opacity-80 hover:opacity-100 transition-opacity duration-300"
-                  loading="lazy"
-                />
-              </div>
-            ))}
+           
           </div>
         </div>
       </div>
@@ -69,12 +82,11 @@ export default function PartnerMarquee() {
       <style jsx>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
-          100% { transform: translateX(-${PARTNERS.length * 100}px); } /* ~100px per item */
+          100% { transform: translateX(-50%); }
         }
         .animate-marquee {
           animation: marquee linear infinite;
         }
-        /* Optional: pause on hover */
         .animate-marquee:hover {
           animation-play-state: paused;
         }

@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
 
   // 🚫 If no token → redirect to login
   if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

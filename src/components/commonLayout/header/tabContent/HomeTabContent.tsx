@@ -1,22 +1,64 @@
+"use client";
+
+import { useTranslation } from "@/hooks/useTranslation";
 import BuyCryptoSection from "../../home/BuyCryptoSection";
 import PartnerMarquee from "../../home/PartnersSection";
 import SliderSection from "../../model/SliderSection";
 
-const HomeTabCOntent = () => {
-  
+const HomeTabContent = () => {
+  const { t } = useTranslation();
+
+  // Section configuration with translation keys
+  const sections = [
+    {
+      type: "hot",
+      translationKey: "sections.hot_games",
+      icon: "🔥",
+      showArrows: true,
+    },
+    {
+      type: "slot-game",
+      translationKey: "sections.slot_games",
+      icon: "🎰",
+      showArrows: true,
+    },
+    {
+      type: "lottory",
+      translationKey: "sections.lottery_games",
+      icon: "🎟️",
+      showArrows: true,
+    },
+    {
+      type: "live",
+      translationKey: "sections.live_games",
+      icon: "📺",
+      showArrows: false,
+    },
+    {
+      type: "sport",
+      translationKey: "sections.sports_games",
+      icon: "🏆",
+      showArrows: false,
+    },
+    {
+      type: "table-game",
+      translationKey: "sections.table_games",
+      icon: "🎲",
+      showArrows: false,
+    },
+  ];
+
   return (
     <div className="bg-[#3B393A]">
-       <SliderSection type="hot" title="Hot Games" icon="🔥" />
-
-      <SliderSection type="slot-game" title="Slots Games" icon="🎰" />
-      
-      <SliderSection type="lottory" title="Lottery Games" icon="🎟️" />
-      
-      <SliderSection type="live" title="Live Games" icon="📺" showArrows={false} />
-      
-      <SliderSection type="sport" title="Sports Games" icon="🏆" showArrows={false} />
-      
-      <SliderSection type="table-game" title="Table Games" icon="🎲" showArrows={false} />
+      {sections.map((section) => (
+        <SliderSection
+          key={section.type}
+          type={section.type}
+          title={t(section.translationKey)}
+          icon={section.icon}
+          showArrows={section.showArrows}
+        />
+      ))}
 
       <BuyCryptoSection />
       <PartnerMarquee />
@@ -24,4 +66,4 @@ const HomeTabCOntent = () => {
   );
 };
 
-export default HomeTabCOntent;
+export default HomeTabContent;

@@ -16,6 +16,9 @@ import {
   Settings2,
   SquarePlus,
   User,
+  ParkingMeter,
+  PackageX,
+  SectionIcon,
 } from "lucide-react";
 
 export const SIDEBAR_CONFIG: SidebarSection[] = [
@@ -53,6 +56,15 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         icon: User,
         items: [
           { title: "User Handel", url: "/admin/controll-user", icon: Settings },
+        ],
+      },
+      {
+        title: "Section Management",
+        icon: SectionIcon,
+        items: [
+          { title: "Partner Management", url: "/admin/partners", icon: Settings },
+          { title: "Crypto Exchanges ", url: "/admin/crypto-exchanges", icon: Settings },
+          { title: "Support  ", url: "/admin/support", icon: Settings },
         ],
       },
     ],

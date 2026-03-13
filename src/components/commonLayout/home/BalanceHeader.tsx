@@ -53,7 +53,7 @@ const BalanceHeader = ({ wallet, onRefresh }: BalanceHeaderProps) => {
   };
 
   return (
-    <div className="bg-gradient-to-r from-gray-700 to-gray-800 rounded-xl px-3 py-1.5 flex items-center justify-between shadow-sm gap-2">
+    <div className="bg-chart-4/10 backdrop-blur-sm rounded-xl px-3 py-1.5 flex items-center justify-between shadow-sm gap-2">
       {/* Left: Token + Balance */}
       <div className="flex items-center space-x-2">
         <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center">

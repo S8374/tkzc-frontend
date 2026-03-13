@@ -6,14 +6,22 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import toast from "react-hot-toast";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface SignUpModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRegisterSuccess: () => void; // ✅ ADD THIS
+  onRegisterSuccess: () => void;
+  onSwitchToLogin?: () => void; // Add this prop
 }
 
-export default function SignUpModal({ isOpen, onClose ,  onRegisterSuccess}: SignUpModalProps) {
+export default function SignUpModal({ 
+  isOpen, 
+  onClose, 
+  onRegisterSuccess,
+  onSwitchToLogin 
+}: SignUpModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -50,42 +58,49 @@ export default function SignUpModal({ isOpen, onClose ,  onRegisterSuccess}: Sig
 
   if (!isOpen) return null;
 
-const handleRegister = async () => {
-  if (!name || !password || !confirmPassword) {
-    return toast.error("All fields are required");
-  }
-
-  if (password !== confirmPassword) {
-    return toast.error("Passwords do not match");
-  }
-
-  if (!imHuman) {
-    return toast.error("Please verify you are human");
-  }
-
-  try {
-    setLoading(true);
-
-    const res = await authService.register({
-      name,
-      password,
-      referralCode,
-      imHuman: true,
-    });
-
-    if (res?.success) {
-      onRegisterSuccess(); // 🔥 update Header instantly
-      toast.success("Registration successful 🎉");
-      onClose();
-      router.push("/deposit");
+  const handleRegister = async () => {
+    if (!name || !password || !confirmPassword) {
+      return toast.error(t('auth.allFieldsRequired', 'All fields are required'));
     }
 
-  } catch (error: any) {
-    toast.error(error?.response?.data?.message || "Registration failed");
-  } finally {
-    setLoading(false);
-  }
-};
+    if (password !== confirmPassword) {
+      return toast.error(t('auth.passwordsDoNotMatch', 'Passwords do not match'));
+    }
+
+    if (!imHuman) {
+      return toast.error(t('auth.verifyHuman', 'Please verify you are human'));
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await authService.register({
+        name,
+        password,
+        referralCode,
+        imHuman: true,
+      });
+
+      if (res?.success) {
+        onRegisterSuccess();
+        toast.success(t('auth.registerSuccess', 'Registration successful 🎉'));
+        onClose();
+        router.push("/deposit");
+      }
+
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || t('auth.registerFailed', 'Registration failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginClick = () => {
+    onClose(); // Close sign up modal
+    if (onSwitchToLogin) {
+      onSwitchToLogin(); // Open login modal
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
@@ -100,12 +115,15 @@ const handleRegister = async () => {
         {/* Gold Wave Header */}
         <div className="relative h-16">
           <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
-            <h2 className="text-2xl font-bold text-white">Welcome Register</h2>
+            <h2 className="text-2xl font-bold text-white">{t('auth.welcomeRegister', 'Welcome Register')}</h2>
             <p className="text-gray-200 text-sm mt-1">
-              Already have an account?{" "}
-              <span className="text-yellow-300 hover:underline cursor-pointer">
-                Log in
-              </span>
+              {t('auth.haveAccount', 'Already have an account?')}{" "}
+              <button 
+                onClick={handleLoginClick}
+                className="text-yellow-300 hover:underline cursor-pointer bg-transparent border-none p-0"
+              >
+                {t('auth.logIn', 'Log in')}
+              </button>
             </p>
           </div>
         </div>
@@ -130,7 +148,7 @@ const handleRegister = async () => {
             </div>
             <input
               type="text"
-              placeholder="Enter username"
+              placeholder={t('auth.enterUsername', 'Enter username')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -148,14 +166,14 @@ const handleRegister = async () => {
               >
                 <path
                   fillRule="evenodd"
-                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 001-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
                   clipRule="evenodd"
                 />
               </svg>
             </div>
             <input
               type="password"
-              placeholder="Enter password"
+              placeholder={t('auth.enterPassword', 'Enter password')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -180,7 +198,7 @@ const handleRegister = async () => {
             </div>
             <input
               type="password"
-              placeholder="Confirm password"
+              placeholder={t('auth.confirmPassword', 'Confirm password')}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -201,7 +219,7 @@ const handleRegister = async () => {
             </div>
             <input
               type="text"
-              placeholder="Referral code (optional)"
+              placeholder={t('auth.referralCodeOptional', 'Referral code (optional)')}
               value={referralCode}
               onChange={(e) => setReferralCode(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -214,7 +232,7 @@ const handleRegister = async () => {
             disabled={loading}
             className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg"
           >
-            {loading ? "Registering..." : "REGISTER"}
+            {loading ? t('auth.registering', 'Registering...') : t('auth.register', 'REGISTER')}
           </button>
 
           {/* I am human */}
@@ -227,7 +245,7 @@ const handleRegister = async () => {
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
               )}
             </div>
-            <span className="text-gray-300">I am human</span>
+            <span className="text-gray-300">{t('auth.iAmHuman', 'I am human')}</span>
           </div>
 
           {/* CAPTCHA */}
@@ -237,7 +255,7 @@ const handleRegister = async () => {
                 sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY as string}
                 onChange={() => {
                   setImHuman(true);
-                  toast.success("Human verified ✅");
+                  toast.success(t('auth.humanVerified', 'Human verified ✅'));
                 }}
               />
             </div>
@@ -246,7 +264,7 @@ const handleRegister = async () => {
           {/* Customer Service */}
           <div className="text-center mt-6">
             <span className="text-yellow-400 font-medium text-sm">
-              Customer Service
+              {t('auth.customerService', 'Customer Service')}
             </span>
           </div>
         </div>
