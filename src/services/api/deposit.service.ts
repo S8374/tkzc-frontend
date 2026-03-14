@@ -63,6 +63,23 @@ export interface FormFieldData {
   paymentMethodId?: string;
   isActive?: boolean;
 }
+// ========== NEW: TITTLE/TITLE INTERFACES ==========
+export interface Tittle {
+  _id: string;
+  title: string;
+  description: string;
+  tab: string; // 'manual', 'auto', 'crypto'
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TittleData {
+  title: string;
+  description: string;
+  tab: string;
+  isActive?: boolean;
+}
 
 export const depositService = {
   // ========== PAYMENT METHODS ==========
@@ -148,6 +165,43 @@ export const depositService = {
 
   async deleteFormField(id: string) {
     const response = await api.delete(`/input/${id}`);
+    return response?.data;
+  },
+
+    // ========== NEW: TITTLE/TITLE METHODS ==========
+  // Admin: Get all tittles
+  async getAllTittles() {
+    const response = await api.get("/payment-methods/tittle");
+    return response?.data;
+  },
+
+  // Admin: Create tittle
+  async createTittle(data: TittleData) {
+    const response = await api.post("/payment-methods/tittle", data);
+    return response?.data;
+  },
+
+  // Admin: Update tittle
+  async updateTittle(id: string, data: Partial<TittleData>) {
+    const response = await api.patch(`/payment-methods/tittle/${id}`, data);
+    return response?.data;
+  },
+
+  // Admin: Delete tittle
+  async deleteTittle(id: string) {
+    const response = await api.delete(`/payment-methods/tittle/${id}`);
+    return response?.data;
+  },
+
+  // Frontend: Get active tittles by tab
+  async getActiveTittlesByTab(tab: string) {
+    const response = await api.get(`/payment-methods/active/${tab}`);
+    return response?.data;
+  },
+
+  // Frontend: Get single tittle by id
+  async getSingleTittle(id: string) {
+    const response = await api.get(`/payment-methods/tittle/${id}`);
     return response?.data;
   },
 };

@@ -19,7 +19,8 @@ import {
   Link2,
   CheckCircle,
   Loader2,
-  Star
+  Star,
+  Type
 } from "lucide-react";
 import { depositService } from "@/services/api/deposit.service";
 import { promotionService, Promotion } from "@/services/api/promotion.service";
@@ -59,6 +60,16 @@ interface FormField {
   isBonusField?: boolean;
 }
 
+interface Tittle {
+  _id: string;
+  title: string;
+  description: string;
+  tab: TabType;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Helper function to generate slug from name
 const generateSlug = (text: string) => {
   if (!text) return '';
@@ -77,6 +88,7 @@ export default function DepositManagement() {
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [tittles, setTittles] = useState<Tittle[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Modal states
@@ -84,6 +96,7 @@ export default function DepositManagement() {
   const [showInstructionModal, setShowInstructionModal] = useState(false);
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showTittleModal, setShowTittleModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   
   // Upload states for payment method icon
@@ -133,6 +146,12 @@ export default function DepositManagement() {
     endDate: ''
   });
 
+  const [tittleForm, setTittleForm] = useState({
+    title: '',
+    description: '',
+    isActive: true
+  });
+
   // Auto-generate slug preview when name changes
   useEffect(() => {
     if (!editingItem && methodForm.name && !methodForm.slug) {
@@ -175,6 +194,12 @@ export default function DepositManagement() {
       const promotionsRes = await promotionService.getPromotionsByTab(activeTab);
       if (promotionsRes?.success) {
         setPromotions(promotionsRes.data || []);
+      }
+
+      // Fetch tittles for this tab
+      const tittlesRes = await depositService.getActiveTittlesByTab(activeTab);
+      if (tittlesRes?.success) {
+        setTittles(tittlesRes.data || []);
       }
 
     } catch (error) {
@@ -365,6 +390,7 @@ export default function DepositManagement() {
       setShowInstructionModal(false);
       resetInstructionForm();
       fetchData();
+      alert("Instruction created successfully!");
     } catch (error) {
       console.error("Error creating instruction:", error);
       alert("Failed to create instruction");
@@ -379,6 +405,7 @@ export default function DepositManagement() {
       setEditingItem(null);
       resetInstructionForm();
       fetchData();
+      alert("Instruction updated successfully!");
     } catch (error) {
       console.error("Error updating instruction:", error);
       alert("Failed to update instruction");
@@ -390,6 +417,7 @@ export default function DepositManagement() {
     try {
       await depositService.deleteInstruction(id);
       fetchData();
+      alert("Instruction deleted successfully!");
     } catch (error) {
       console.error("Error deleting instruction:", error);
       alert("Failed to delete instruction");
@@ -587,6 +615,81 @@ export default function DepositManagement() {
     }
   };
 
+  // ========== TITTLE HANDLERS ==========
+  const handleCreateTittle = async () => {
+    try {
+      if (!tittleForm.title || !tittleForm.description) {
+        alert("Please fill in all required fields");
+        return;
+      }
+
+      await depositService.createTittle({
+        title: tittleForm.title,
+        description: tittleForm.description,
+        tab: activeTab,
+        isActive: tittleForm.isActive
+      });
+      setShowTittleModal(false);
+      resetTittleForm();
+      fetchData();
+      alert("Title created successfully!");
+    } catch (error: any) {
+      console.error("Error creating title:", error);
+      if (error.response?.data?.message?.includes("already exists")) {
+        alert(error.response.data.message);
+      } else {
+        alert("Failed to create title");
+      }
+    }
+  };
+
+  const handleUpdateTittle = async () => {
+    if (!editingItem) return;
+    try {
+      await depositService.updateTittle(editingItem._id, {
+        title: tittleForm.title,
+        description: tittleForm.description,
+        isActive: tittleForm.isActive
+      });
+      setShowTittleModal(false);
+      setEditingItem(null);
+      resetTittleForm();
+      fetchData();
+      alert("Title updated successfully!");
+    } catch (error: any) {
+      console.error("Error updating title:", error);
+      if (error.response?.data?.message?.includes("already exists")) {
+        alert(error.response.data.message);
+      } else {
+        alert("Failed to update title");
+      }
+    }
+  };
+
+  const handleDeleteTittle = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this title?")) return;
+    try {
+      await depositService.deleteTittle(id);
+      fetchData();
+      alert("Title deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting title:", error);
+      alert("Failed to delete title");
+    }
+  };
+
+  const handleToggleTittleActive = async (tittle: Tittle) => {
+    try {
+      await depositService.updateTittle(tittle._id, {
+        isActive: !tittle.isActive
+      });
+      fetchData();
+    } catch (error) {
+      console.error("Error toggling title status:", error);
+      alert("Failed to update title status");
+    }
+  };
+
   // ========== UTILITY FUNCTIONS ==========
   const resetMethodForm = () => {
     setMethodForm({
@@ -634,6 +737,14 @@ export default function DepositManagement() {
       endDate: ''
     });
     setPromoIconUploadStatus('idle');
+  };
+
+  const resetTittleForm = () => {
+    setTittleForm({
+      title: '',
+      description: '',
+      isActive: true
+    });
   };
 
   const openEditMethod = (method: PaymentMethod) => {
@@ -690,6 +801,16 @@ export default function DepositManagement() {
     setShowPromotionModal(true);
   };
 
+  const openEditTittle = (tittle: Tittle) => {
+    setEditingItem(tittle);
+    setTittleForm({
+      title: tittle.title,
+      description: tittle.description,
+      isActive: tittle.isActive
+    });
+    setShowTittleModal(true);
+  };
+
   const formatBonus = (promotion: Promotion) => {
     if (promotion.type === 'PERCENT') {
       return `${promotion.value}%`;
@@ -742,6 +863,92 @@ export default function DepositManagement() {
 
         {/* Content Sections */}
         <div className="bg-gray-800 rounded-b-lg p-6 space-y-8">
+          {/* Tittle/Title Section - NEW */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Type className="w-5 h-5 text-indigo-500" />
+                Page Title & Description
+              </h2>
+              {tittles.length === 0 && (
+                <button
+                  onClick={() => {
+                    setEditingItem(null);
+                    resetTittleForm();
+                    setShowTittleModal(true);
+                  }}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Title
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {tittles.map((tittle) => (
+                <div
+                  key={tittle._id}
+                  className={`bg-gray-700 rounded-lg p-4 border ${
+                    tittle.isActive ? 'border-indigo-600/50' : 'border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Type className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-white font-semibold text-lg">{tittle.title}</h3>
+                      </div>
+                      <p className="text-gray-300 mb-2">{tittle.description}</p>
+                      <p className="text-xs text-gray-400">
+                        Status: {tittle.isActive ? 'Active' : 'Inactive'}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => handleToggleTittleActive(tittle)}
+                        className={`p-2 rounded-lg ${
+                          tittle.isActive ? 'bg-green-600' : 'bg-gray-600'
+                        }`}
+                      >
+                        <Power className="w-4 h-4 text-white" />
+                      </button>
+                      <button
+                        onClick={() => openEditTittle(tittle)}
+                        className="p-2 bg-blue-600 rounded-lg"
+                      >
+                        <Edit className="w-4 h-4 text-white" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTittle(tittle._id)}
+                        className="p-2 bg-red-600 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {tittles.length === 0 && (
+                <div className="text-center py-8 bg-gray-750 rounded-lg border border-dashed border-gray-600">
+                  <Type className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No title set for {tabLabels[activeTab]}</p>
+                  <button
+                    onClick={() => {
+                      setEditingItem(null);
+                      resetTittleForm();
+                      setShowTittleModal(true);
+                    }}
+                    className="mt-3 text-indigo-400 hover:text-indigo-300 text-sm"
+                  >
+                    + Add a title and description
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Promotions / Bonuses Section */}
           <div>
             <div className="flex justify-between items-center mb-4">
@@ -1396,7 +1603,7 @@ export default function DepositManagement() {
         </div>
       )}
 
-      {/* Form Field Modal - Scrollable with Sticky Header and Footer */}
+      {/* Form Field Modal */}
       {showFieldModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
@@ -1895,6 +2102,94 @@ export default function DepositManagement() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tittle/Title Modal - NEW */}
+      {showTittleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-white">
+                {editingItem ? 'Edit Title & Description' : 'Add Title & Description'}
+              </h3>
+              <button onClick={() => setShowTittleModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              editingItem ? handleUpdateTittle() : handleCreateTittle();
+            }} className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={tittleForm.title}
+                  onChange={(e) => setTittleForm({...tittleForm, title: e.target.value})}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                  placeholder="e.g., Deposit Methods"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Description *</label>
+                <textarea
+                  value={tittleForm.description}
+                  onChange={(e) => setTittleForm({...tittleForm, description: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                  placeholder="Enter a description for this page"
+                  required
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  This title and description will be displayed at the top of the deposit page
+                </p>
+              </div>
+
+              {/* Active Status */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="tittleActive"
+                  checked={tittleForm.isActive}
+                  onChange={(e) => setTittleForm({...tittleForm, isActive: e.target.checked})}
+                  className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
+                />
+                <label htmlFor="tittleActive" className="ml-2 text-sm text-gray-300">
+                  Active
+                </label>
+              </div>
+
+              {/* Note about uniqueness */}
+              <div className="bg-indigo-600/20 border border-indigo-600/30 rounded-lg p-3">
+                <p className="text-xs text-indigo-400">
+                  <strong>Note:</strong> Only one title & description can exist per tab. Creating a new one will replace the existing one.
+                </p>
+              </div>
+
+              {/* Form Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowTittleModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+                >
+                  {editingItem ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

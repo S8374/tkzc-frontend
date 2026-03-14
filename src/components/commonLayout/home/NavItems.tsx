@@ -2,13 +2,16 @@
 
 import { useTranslation } from "@/hooks/useTranslation";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
+import { authService } from "@/services/api/auth.services";
 
 const NavItems = () => {
   const { t } = useTranslation();
-
+const [isLoggedIn, setIsLoggedIn] = useState(false);
+const [loading, setLoading] = useState(true);
+  console.log("NavItems rendered, isLoggedIn:", isLoggedIn);
   const items = useMemo(() => [
     {
       iconImg: "https://tkzc668.com/static/img/%E9%87%91%E5%88%9A%E5%8C%BA_%E5%85%85%E5%80%BC.79e3487a.webp",
@@ -53,17 +56,36 @@ const NavItems = () => {
 
     return translationMap[key] || key;
   };
+useEffect(() => {
+  const checkAuth = async () => {
+    try {
+      const res = await authService.me(undefined);
 
-  // 🔥 LOGIN CHECK
-  const handleProtectedClick = (e: React.MouseEvent) => {
-    const token = Cookies.get("accessToken");
-
-    if (!token) {
-      e.preventDefault();
-      toast.error("Please login first");
+      if (res?.statusCode === 200) {
+        setIsLoggedIn(true);
+      }
+    } catch {
+      setIsLoggedIn(false);
+    } finally {
+      setLoading(false);
     }
   };
 
+  checkAuth();
+}, []);
+
+  // 🔥 LOGIN CHECK
+const handleProtectedClick = (e: React.MouseEvent) => {
+  if (loading) {
+    e.preventDefault();
+    return;
+  }
+
+  if (!isLoggedIn) {
+    e.preventDefault();
+    toast.error("Please login first");
+  }
+};
   return (
     <div className="flex flex-wrap justify-center gap-4 sm:gap-6 md:gap-8 px-2 py-4">
       {items.map((item) => (

@@ -76,7 +76,7 @@ export default function DepositPage() {
   const [amountFieldName, setAmountFieldName] = useState<string>("");
   const [amountField, setAmountField] = useState<FormField | null>(null);
   const [bonusField, setBonusField] = useState<FormField | null>(null);
-
+  const [tittle, setTittle] = useState<string>("");
   // Form state - will store all form field values dynamically
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [calculatedBonus, setCalculatedBonus] = useState<number | null>(null);
@@ -90,8 +90,8 @@ export default function DepositPage() {
   const [loading, setLoading] = useState(true);
 
   const walletAddress = "TEfuvvysBmXuUmBUxZGFM1J9a6LSVHGCP";
-
-  // Reset promotion selection when tab changes
+  console.log("Component rendered, tittle:",tittle );
+  // Reset promotion selection when tab changes 
   useEffect(() => {
     setSelectedPromotion(null);
     setCalculatedBonus(null);
@@ -115,15 +115,15 @@ export default function DepositPage() {
   useEffect(() => {
     if (formFields.length > 0) {
       console.log("All form fields:", formFields);
-      
+
       // Find amount field - check for "Amount" exactly or includes amount
-      const amountField = formFields.find(f => 
-        f.name === 'Amount' || 
+      const amountField = formFields.find(f =>
+        f.name === 'Amount' ||
         f.name.toLowerCase() === 'amount' ||
         f.label.toLowerCase().includes('amount') ||
         f.name.toLowerCase().includes('amount')
       );
-      
+
       if (amountField) {
         setAmountFieldName(amountField.name);
         setAmountField(amountField);
@@ -153,7 +153,7 @@ export default function DepositPage() {
       const amount = parseFloat(formData[amountFieldName]);
       if (!isNaN(amount) && amount > 0) {
         calculateBonus(amount);
-        
+
         // Check minimum deposit for selected promotion
         if (selectedPromotion.minDeposit) {
           if (amount < selectedPromotion.minDeposit) {
@@ -197,7 +197,12 @@ export default function DepositPage() {
           setSelectedMethod(methodsRes.data[0]);
         }
       }
-
+      // Fetch page title for this tab
+      const tittleRes = await depositService.getActiveTittlesByTab(activeTab);
+      console.log("Page title:", tittleRes);
+      if (tittleRes?.success && tittleRes.data && tittleRes.data.length > 0) {
+        setTittle(tittleRes.data[0]);
+      }
       // Fetch instructions for this tab
       const instructionsRes = await depositService.getInstructionsByTab(activeTab);
       if (instructionsRes?.success) {
@@ -207,7 +212,7 @@ export default function DepositPage() {
       // Fetch form fields for this tab
       const fieldsRes = await depositService.getFormFieldsByTab(activeTab);
       console.log("Form fields received:", fieldsRes);
-      
+
       if (fieldsRes?.success) {
         setFormFields(fieldsRes.data || []);
         // Initialize form data with empty strings for all fields
@@ -222,7 +227,7 @@ export default function DepositPage() {
       // Fetch promotions for this tab
       const promotionsRes = await promotionService.getPromotionsByTab(activeTab);
       console.log("Promotions:", promotionsRes);
-      
+
       if (promotionsRes?.success) {
         setPromotions(promotionsRes.data || []);
       }
@@ -236,13 +241,13 @@ export default function DepositPage() {
 
   const calculateBonus = (amount: number) => {
     if (!selectedPromotion) return;
-    
+
     // Check if amount meets minimum deposit
     if (selectedPromotion.minDeposit && amount < selectedPromotion.minDeposit) {
       setCalculatedBonus(null);
       return;
     }
-    
+
     // Calculate bonus for selected promotion only
     let bonus = 0;
     if (selectedPromotion.type === 'PERCENT') {
@@ -250,7 +255,7 @@ export default function DepositPage() {
     } else {
       bonus = selectedPromotion.value;
     }
-    
+
     setCalculatedBonus(bonus);
   };
 
@@ -260,10 +265,10 @@ export default function DepositPage() {
       alert("This promotion is not available for the selected payment method");
       return;
     }
-    
+
     setSelectedPromotion(promo);
     setShowPromoDetails(false);
-    
+
     // Show a message about minimum deposit
     if (promo.minDeposit) {
       alert(`Minimum deposit for ${promo.bonusName} is ৳${promo.minDeposit}`);
@@ -301,35 +306,35 @@ export default function DepositPage() {
     if (!file) return;
 
     setUploadStatus('uploading');
-    
+
     // Simulate upload - replace with actual ImageBB upload logic
     setTimeout(() => {
       // Mock successful upload
       const mockUrl = `https://i.ibb.co/example/uploaded-${Date.now()}.jpg`;
       setUploadedFileUrl(mockUrl);
       setUploadStatus('success');
-      
+
       // Store the uploaded file URL in form data with the field name
       handleInputChange(fieldName, mockUrl);
-      
+
       setTimeout(() => setUploadStatus('idle'), 3000);
     }, 2000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Log all form data before submission
     console.log("Submitting form with data:", formData);
     console.log("All form fields:", formFields);
-    
+
     // Find the amount field - use the one we identified or try to find it
-    const amountFieldObj = amountField || formFields.find(f => 
-      f.name === 'Amount' || 
+    const amountFieldObj = amountField || formFields.find(f =>
+      f.name === 'Amount' ||
       f.name.toLowerCase() === 'amount' ||
       f.label.toLowerCase().includes('amount')
     );
-    
+
     // Check if amount is valid
     let amount = 0;
     if (amountFieldObj && formData[amountFieldObj.name]) {
@@ -359,7 +364,7 @@ export default function DepositPage() {
     const missingFields = formFields
       .filter(f => f.required && !formData[f.name])
       .map(f => f.label);
-    
+
     if (missingFields.length > 0) {
       alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
       return;
@@ -367,7 +372,7 @@ export default function DepositPage() {
 
     try {
       setSubmitting(true);
-      
+
       // Prepare request data - this will include ALL form fields dynamically
       const requestData: any = {
         depositType: activeTab,
@@ -394,18 +399,18 @@ export default function DepositPage() {
       // For crypto/auto, extract common fields
       if (activeTab === 'crypto') {
         // Find transaction ID field (if exists)
-        const txField = formFields.find(f => 
-          f.name.toLowerCase().includes('transaction') || 
+        const txField = formFields.find(f =>
+          f.name.toLowerCase().includes('transaction') ||
           f.label.toLowerCase().includes('transaction') ||
           f.name.toLowerCase().includes('tx')
         );
         if (txField && formData[txField.name]) {
           requestData.transactionId = formData[txField.name];
         }
-        
+
         // Find wallet address field (if exists)
-        const walletField = formFields.find(f => 
-          f.name.toLowerCase().includes('wallet') || 
+        const walletField = formFields.find(f =>
+          f.name.toLowerCase().includes('wallet') ||
           f.label.toLowerCase().includes('wallet') ||
           f.name.toLowerCase().includes('address')
         );
@@ -418,8 +423,8 @@ export default function DepositPage() {
 
       if (activeTab === 'auto') {
         // Find sender number field (if exists)
-        const senderField = formFields.find(f => 
-          f.name.toLowerCase().includes('sender') || 
+        const senderField = formFields.find(f =>
+          f.name.toLowerCase().includes('sender') ||
           f.label.toLowerCase().includes('sender') ||
           f.name.toLowerCase().includes('phone') ||
           f.name.toLowerCase().includes('number')
@@ -427,10 +432,10 @@ export default function DepositPage() {
         if (senderField && formData[senderField.name]) {
           requestData.senderNumber = formData[senderField.name];
         }
-        
+
         // Find transaction ID field (if exists)
-        const txField = formFields.find(f => 
-          f.name.toLowerCase().includes('transaction') || 
+        const txField = formFields.find(f =>
+          f.name.toLowerCase().includes('transaction') ||
           f.label.toLowerCase().includes('transaction') ||
           f.name.toLowerCase().includes('tx')
         );
@@ -442,11 +447,11 @@ export default function DepositPage() {
       console.log("Sending request data:", requestData);
 
       const response = await depositRequestService.createRequest(requestData);
-      
+
       if (response?.success) {
         setSubmittedRequest(response.data);
         setShowSuccessModal(true);
-        
+
         // Reset form
         const initialData: Record<string, string> = {};
         formFields.forEach((field: FormField) => {
@@ -459,7 +464,7 @@ export default function DepositPage() {
         setAmountError(null);
         setUploadStatus('idle');
         setUploadedFileUrl("");
-        
+
         console.log("Form reset successfully");
       }
     } catch (error) {
@@ -475,11 +480,11 @@ export default function DepositPage() {
     if (field.isBonusField) return <Star className="w-4 h-4 text-yellow-500" />;
     if (field.type === 'number') return <Hash className="w-4 h-4 text-gray-400" />;
     if (field.type === 'textarea') return <FileText className="w-4 h-4 text-gray-400" />;
-    if (field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('sender')) 
+    if (field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('sender'))
       return <Phone className="w-4 h-4 text-gray-400" />;
-    if (field.name.toLowerCase().includes('name')) 
+    if (field.name.toLowerCase().includes('name'))
       return <UserIcon className="w-4 h-4 text-gray-400" />;
-    if (field.name.toLowerCase().includes('email')) 
+    if (field.name.toLowerCase().includes('email'))
       return <Mail className="w-4 h-4 text-gray-400" />;
     return <FileText className="w-4 h-4 text-gray-400" />;
   };
@@ -550,31 +555,28 @@ export default function DepositPage() {
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => handleTabChange("manual")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === "manual"
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "manual"
                 ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
                 : "bg-[#0689ff] text-white border border-white"
-            }`}
+              }`}
           >
             BDT - Manual
           </button>
           <button
             onClick={() => handleTabChange("auto")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === "auto"
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "auto"
                 ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
                 : "bg-[#0689ff] text-white border border-white"
-            }`}
+              }`}
           >
             Auto Deposit
           </button>
           <button
             onClick={() => handleTabChange("crypto")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === "crypto"
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "crypto"
                 ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
                 : "bg-[#0689ff] text-white border border-white"
-            }`}
+              }`}
           >
             Crypto Deposit
           </button>
@@ -622,7 +624,7 @@ export default function DepositPage() {
               </div>
               <Sparkles className="w-4 h-4 text-yellow-400" />
             </div>
-            
+
             <div className="grid grid-cols-1 gap-3">
               {promotions.filter(p => p.isActive).map((promo, index) => (
                 <div
@@ -684,11 +686,10 @@ export default function DepositPage() {
                   <div
                     key={method._id}
                     onClick={() => setSelectedMethod(method)}
-                    className={`bg-white rounded-xl p-2 h-14 flex items-center justify-center text-black border-2 cursor-pointer transition-all ${
-                      selectedMethod?._id === method._id
+                    className={`bg-white rounded-xl p-2 h-14 flex items-center justify-center text-black border-2 cursor-pointer transition-all ${selectedMethod?._id === method._id
                         ? 'border-green-500 scale-105 shadow-lg'
                         : 'border-transparent hover:border-green-300'
-                    }`}
+                      }`}
                   >
                     <div className="w-full h-full flex items-center justify-center">
                       {getMethodIcon(method)}
@@ -731,18 +732,17 @@ export default function DepositPage() {
                         />
                         <label
                           htmlFor={`screenshot-${field._id}`}
-                          className={`block w-full rounded-xl px-4 py-3 text-center cursor-pointer transition font-medium ${
-                            formData[field.name] 
-                              ? 'bg-green-600 text-white' 
+                          className={`block w-full rounded-xl px-4 py-3 text-center cursor-pointer transition font-medium ${formData[field.name]
+                              ? 'bg-green-600 text-white'
                               : uploadStatus === 'error'
-                              ? 'bg-red-600 text-white'
-                              : 'bg-white text-black hover:brightness-110'
-                          }`}
+                                ? 'bg-red-600 text-white'
+                                : 'bg-white text-black hover:brightness-110'
+                            }`}
                         >
-                          {uploadStatus === 'uploading' ? 'Uploading...' : 
-                           formData[field.name] ? 'Upload Successful!' :
-                           uploadStatus === 'error' ? 'Upload Failed. Try Again.' :
-                           field.label}
+                          {uploadStatus === 'uploading' ? 'Uploading...' :
+                            formData[field.name] ? 'Upload Successful!' :
+                              uploadStatus === 'error' ? 'Upload Failed. Try Again.' :
+                                field.label}
                         </label>
                         {formData[field.name] && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -766,9 +766,8 @@ export default function DepositPage() {
                           }
                           required={field.required}
                           min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
-                          className={`w-full bg-white border-0 rounded-xl pl-10 pr-4 py-3 text-black text-center text-lg placeholder-black focus:outline-none focus:ring-2 ${
-                            amountError && field.name === amountFieldName ? 'focus:ring-red-400 border-2 border-red-400' : 'focus:ring-green-400'
-                          }`}
+                          className={`w-full bg-white border-0 rounded-xl pl-10 pr-4 py-3 text-black text-center text-lg placeholder-black focus:outline-none focus:ring-2 ${amountError && field.name === amountFieldName ? 'focus:ring-red-400 border-2 border-red-400' : 'focus:ring-green-400'
+                            }`}
                         />
                         {/* Bonus indicator for amount field */}
                         {field.name === amountFieldName && calculatedBonus && (
@@ -825,7 +824,7 @@ export default function DepositPage() {
             <div className="mb-6">
               <div className="bg-green-900/30 border border-green-800/50 rounded-lg p-3 mb-5 text-xs">
                 <p className="text-green-300 font-medium">
-                  গাড়ি পেমেন্ট করতে হলে ২.০% চার্জ লাগবে এবং বিকাশ/নগদ/রকেট থেকে পেমেন্ট করুন
+                  {tittle?.title}
                 </p>
               </div>
 
@@ -833,14 +832,13 @@ export default function DepositPage() {
               {paymentMethods.length > 0 && (
                 <div className="flex justify-center gap-4 mb-4">
                   {paymentMethods.map((method) => (
-                    <div 
-                      key={method._id} 
+                    <div
+                      key={method._id}
                       onClick={() => setSelectedMethod(method)}
-                      className={`w-24 h-24 rounded-full flex items-center justify-center p-1 cursor-pointer transition-all ${
-                        selectedMethod?._id === method._id
+                      className={`w-24 h-24 rounded-full flex items-center justify-center p-1 cursor-pointer transition-all ${selectedMethod?._id === method._id
                           ? 'bg-gradient-to-r from-green-500 to-green-600 scale-105'
                           : 'bg-white/10 hover:bg-white/20'
-                      }`}
+                        }`}
                     >
                       <div className="w-full h-full bg-white rounded-full flex items-center justify-center p-2">
                         {method.icon ? (
@@ -896,9 +894,8 @@ export default function DepositPage() {
                       }
                       required={field.required}
                       min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
-                      className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-4 text-black text-center text-xl placeholder-black border-2 ${
-                        amountError && field.name === amountFieldName ? 'border-red-400' : 'border-[#d12d4d]'
-                      } focus:outline-none focus:ring-2 focus:ring-red-400`}
+                      className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-4 text-black text-center text-xl placeholder-black border-2 ${amountError && field.name === amountFieldName ? 'border-red-400' : 'border-[#d12d4d]'
+                        } focus:outline-none focus:ring-2 focus:ring-red-400`}
                     />
                     {field.name === amountFieldName && calculatedBonus && (
                       <div className="absolute -bottom-5 left-0 right-0 text-center">
@@ -949,14 +946,13 @@ export default function DepositPage() {
             {/* Network Selection */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               {paymentMethods.map((method) => (
-                <div 
-                  key={method._id} 
+                <div
+                  key={method._id}
                   onClick={() => setSelectedMethod(method)}
-                  className={`bg-white rounded-xl p-3 border-2 cursor-pointer transition-all ${
-                    selectedMethod?._id === method._id
+                  className={`bg-white rounded-xl p-3 border-2 cursor-pointer transition-all ${selectedMethod?._id === method._id
                       ? 'border-green-500 scale-105 shadow-lg'
                       : 'border-gray-700 hover:border-green-300'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     {method.icon ? (
@@ -1107,9 +1103,8 @@ export default function DepositPage() {
                         }
                         required={field.required}
                         min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
-                        className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-3 text-black border-2 ${
-                          amountError && field.name === amountFieldName ? 'border-red-400' : 'border-[#fc0613]'
-                        } text-center placeholder-black focus:outline-none focus:ring-2 focus:ring-red-400`}
+                        className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-3 text-black border-2 ${amountError && field.name === amountFieldName ? 'border-red-400' : 'border-[#fc0613]'
+                          } text-center placeholder-black focus:outline-none focus:ring-2 focus:ring-red-400`}
                       />
                       {field.name === amountFieldName && calculatedBonus && (
                         <div className="absolute -bottom-5 left-0 right-0 text-center">

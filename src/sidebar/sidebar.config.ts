@@ -19,6 +19,7 @@ import {
   ParkingMeter,
   PackageX,
   SectionIcon,
+  Wallet,
 } from "lucide-react";
 
 export const SIDEBAR_CONFIG: SidebarSection[] = [
@@ -48,7 +49,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         icon: PilcrowLeft,
         items: [
           { title: "Deposite Handel", url: "/admin/add-deposite", icon: Settings },
-            { title: "Deposite Request", url: "/admin/deposit-request", icon: Settings },
+          { title: "Deposite Request", url: "/admin/deposit-request", icon: Settings },
         ],
       },
       {
@@ -65,6 +66,13 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
           { title: "Partner Management", url: "/admin/partners", icon: Settings },
           { title: "Crypto Exchanges ", url: "/admin/crypto-exchanges", icon: Settings },
           { title: "Support  ", url: "/admin/support", icon: Settings },
+        ],
+      },
+      {
+        title: "My Wallet",
+        icon: Wallet,
+        items: [
+          { title: "My Wallet", url: "/sheard/my-wallet", icon: Settings },
         ],
       },
     ],

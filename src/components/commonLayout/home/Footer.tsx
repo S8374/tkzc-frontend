@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   Gift,
@@ -9,55 +8,73 @@ import {
   User,
   Headset,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CustomerModal from "../model/CustomerModal";
 import { useTranslation } from "@/hooks/useTranslation";
-import Cookies from "js-cookie";
 import toast from "react-hot-toast";
+import { authService } from "@/services/api/auth.services";
 
 const Footer = () => {
   const { t } = useTranslation();
   const pathname = usePathname();
+  const router = useRouter();
+
   const [isCustomerOpen, setIsCustomerOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  console.log("Footer rendered, isLoggedIn:", isLoggedIn);
+  // ✅ Check login using /auth/me
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await authService.me(undefined);
+        console.log("Auth check response:", res);
+        if (res?.statusCode === 200) {
+          setIsLoggedIn(true);
+        }
+      } catch {
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const navItems = [
-    { 
-      id: "home", 
-      label: t('footer.home', 'Home'), 
-      href: "/", 
-      icon: Home 
+    {
+      id: "home",
+      label: t("footer.home", "Home"),
+      href: "/",
+      icon: Home,
     },
-    { 
-      id: "promotion", 
-      label: t('footer.promo', 'Promo'), 
-      href: "/promotion", 
-      icon: Gift 
+    {
+      id: "promotion",
+      label: t("footer.promo", "Promo"),
+      href: "/promotion",
+      icon: Gift,
     },
-    { 
-      id: "customer", 
-      label: t('footer.customer', 'Customer'), 
-      href: "#", 
-      icon: Headset 
+    {
+      id: "customer",
+      label: t("footer.customer", "Customer"),
+      href: "#",
+      icon: Headset,
     },
-    { 
-      id: "download", 
-      label: t('footer.download', 'Download'), 
-      href: "/download", 
-      icon: Download 
+    {
+      id: "download",
+      label: t("footer.download", "Download"),
+      href: "/vpn-download",
+      icon: Download,
     },
-    { 
-      id: "account", 
-      label: t('footer.account', 'Account'), 
-      href: "/account", 
-      icon: User 
+    {
+      id: "account",
+      label: t("footer.account", "Account"),
+      href: "/account",
+      icon: User,
     },
   ];
 
-  // Handle navigation for non-modal items
   const handleNavigation = (href: string) => {
-    window.location.href = href;
+    router.push(href);
   };
-
 
   return (
     <>
@@ -70,39 +87,36 @@ const Footer = () => {
             return (
               <button
                 key={item.id}
-               onClick={(e) => {
-  e.preventDefault();
+                onClick={(e) => {
+                  e.preventDefault();
 
-  if (item.id === "customer") {
-    setIsCustomerOpen(true);
-    return;
-  }
+                  if (item.id === "customer") {
+                    setIsCustomerOpen(true);
+                    return;
+                  }
 
-  // 🔒 Protected pages
-  const protectedRoutes = [
-    "/account",
-    "/deposit",
-    "/withdraw",
-    "/tasks",
-    "/my-income",
-    "/invite",
-  ];
+                  // 🔒 Protected pages
+                  const protectedRoutes = [
+                    "/account",
+                    "/deposit",
+                    "/withdraw",
+                    "/tasks",
+                    "/my-income",
+                    "/invite",
+                  ];
 
-  if (protectedRoutes.includes(item.href)) {
-    const token = Cookies.get("accessToken");
+                  if (protectedRoutes.includes(item.href) && !isLoggedIn) {
+                    toast.error("Please login first");
+                    return;
+                  }
 
-    if (!token) {
-      toast.error("Please login first");
-      return;
-    }
-  }
-
-  handleNavigation(item.href);
-}}
+                  handleNavigation(item.href);
+                }}
                 className={`flex flex-col cursor-pointer items-center justify-center gap-1 flex-1 py-2 transition-all duration-200
-                  ${isActive
-                    ? "text-chart-4 scale-105"
-                    : "text-white hover:text-chart-4 hover:scale-105"
+                  ${
+                    isActive
+                      ? "text-chart-4 scale-105"
+                      : "text-white hover:text-chart-4 hover:scale-105"
                   }
                 `}
                 aria-label={item.label}
@@ -112,11 +126,11 @@ const Footer = () => {
                     isActive ? "scale-110" : "scale-100"
                   }`}
                 />
+
                 <span className="text-[11px] font-medium leading-none">
                   {item.label}
                 </span>
-                
-                {/* Active indicator dot */}
+
                 {isActive && (
                   <span className="absolute -top-1 w-1 h-1 rounded-full bg-chart-4" />
                 )}
@@ -127,9 +141,9 @@ const Footer = () => {
       </footer>
 
       {/* Customer Modal */}
-      <CustomerModal 
-        isOpen={isCustomerOpen} 
-        onClose={() => setIsCustomerOpen(false)} 
+      <CustomerModal
+        isOpen={isCustomerOpen}
+        onClose={() => setIsCustomerOpen(false)}
       />
     </>
   );
