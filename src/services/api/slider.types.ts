@@ -8,6 +8,9 @@ export interface SliderType {
   description?: string;
   iconUrl?: string;
   isActive: boolean;
+  gameType?: string;
+  providerCode?: string;
+  providerName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -17,6 +20,9 @@ export interface SliderTypeData {
   description?: string;
   iconUrl?: string;
   isActive?: boolean;
+  gameType?: string;
+  providerCode?: string;
+  providerName?: string;
 }
 
 export const sliderTypeService = {

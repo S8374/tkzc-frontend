@@ -221,11 +221,8 @@ const SliderManagementPage = () => {
                 <div className="text-center">
                     <div className="relative">
                         <div className="w-20 h-20 border-4 border-yellow-500/20 border-t-yellow-500 rounded-full animate-spin"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <LayoutGrid className="w-8 h-8 text-yellow-500 animate-pulse" />
-                        </div>
+                     
                     </div>
-                    <p className="text-gray-400 mt-4">Loading slider data...</p>
                 </div>
             </div>
         );

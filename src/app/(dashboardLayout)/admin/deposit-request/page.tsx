@@ -69,6 +69,7 @@ export default function AdminDepositRequests() {
       if (debouncedSearch) params.search = debouncedSearch;
 
       const response = await depositRequestService.getAllRequests(params);
+      console.log("Fetch response:", response);
       if (response?.success) {
         setRequests(response.data.data || []);
         setStats(response.data.stats || []);
@@ -431,217 +432,200 @@ export default function AdminDepositRequests() {
       </div>
 
       {/* Request Details Modal */}
-      {showDetails && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-white">Deposit Request Details</h3>
-              <button
-                onClick={() => setShowDetails(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
+    {/* Request Details Modal */}
+{showDetails && selectedRequest && (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="bg-gray-800 rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-bold text-white">Deposit Request Details</h3>
+        <button
+          onClick={() => setShowDetails(false)}
+          className="text-gray-400 hover:text-white"
+        >
+          <XCircle className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {/* User Info */}
+        <div className="bg-gray-700 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-gray-400 mb-2">User Information</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-300">Name:</span>
+              <span className="text-white">{selectedRequest.userName}</span>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* User Info */}
-              <div className="bg-gray-700 rounded-lg p-4 col-span-2">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2">User Information</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Name:</span>
-                    <span className="text-white">{selectedRequest.userName}</span>
-                  </div>
-                  {selectedRequest.userEmail && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Email:</span>
-                      <span className="text-white">{selectedRequest.userEmail}</span>
-                    </div>
-                  )}
-                  {selectedRequest.user?.phone && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Phone:</span>
-                      <span className="text-white">{selectedRequest.user.phone}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Deposit Info */}
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2">Deposit Details</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Amount:</span>
-                    <span className="text-white font-bold">৳{selectedRequest.amount}</span>
-                  </div>
-                  {(selectedRequest.bonusAmount ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Bonus:</span>
-                      <span className="text-green-400">+ ৳{selectedRequest.bonusAmount}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Total:</span>
-                    <span className="text-white font-bold">
-                      ৳{selectedRequest.amount + (selectedRequest.bonusAmount || 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Method:</span>
-                    <span className="text-white">{selectedRequest.paymentMethod}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Type:</span>
-                    <span className="text-white capitalize">{selectedRequest.depositType}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Info */}
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2">Status</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Status:</span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                      getStatusBadge(selectedRequest.status).bg
-                    } ${getStatusBadge(selectedRequest.status).text}`}>
-                      {getStatusBadge(selectedRequest.status).icon}
-                      {getStatusBadge(selectedRequest.status).label}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Date:</span>
-                    <span className="text-white text-sm">{formatDate(selectedRequest.createdAt)}</span>
-                  </div>
-                  {selectedRequest.processedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Processed:</span>
-                      <span className="text-white text-sm">{formatDate(selectedRequest.processedAt)}</span>
-                    </div>
-                  )}
-                  {selectedRequest.processedBy && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">By:</span>
-                      <span className="text-white">{selectedRequest.processedBy.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Transaction Details */}
-              {(selectedRequest.transactionId || selectedRequest.senderNumber || selectedRequest.walletAddress) && (
-                <div className="bg-gray-700 rounded-lg p-4 col-span-2">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-2">Transaction Details</h4>
-                  <div className="space-y-2">
-                    {selectedRequest.transactionId && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-300">Transaction ID:</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-white text-sm">{selectedRequest.transactionId}</span>
-                          <button
-                            onClick={() => copyToClipboard(selectedRequest.transactionId!)}
-                            className="text-gray-400 hover:text-white"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {selectedRequest.senderNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Sender Number:</span>
-                        <span className="text-white">{selectedRequest.senderNumber}</span>
-                      </div>
-                    )}
-                    {selectedRequest.walletAddress && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Wallet Address:</span>
-                        <span className="text-white text-sm">{selectedRequest.walletAddress}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Promotion Details - No maxBonus field */}
-              {selectedRequest.promotionName && (
-                <div className="bg-gray-700 rounded-lg p-4 col-span-2">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-2">Promotion Applied</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Promotion:</span>
-                      <span className="text-pink-400">{selectedRequest.promotionName}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Value:</span>
-                      <span className="text-white">
-                        {selectedRequest.promotionType === 'PERCENT' 
-                          ? `${selectedRequest.promotionValue}%` 
-                          : `৳${selectedRequest.promotionValue}`}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Bonus Given:</span>
-                      <span className="text-green-400">৳{selectedRequest.bonusAmount}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Admin Note */}
-              {selectedRequest.adminNote && (
-                <div className="bg-gray-700 rounded-lg p-4 col-span-2">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-2">Admin Note</h4>
-                  <p className="text-white">{selectedRequest.adminNote}</p>
-                </div>
-              )}
-
-              {/* Screenshot */}
-              {selectedRequest.screenshot && (
-                <div className="col-span-2">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-2">Screenshot</h4>
-                  <img
-                    src={selectedRequest.screenshot}
-                    alt="Deposit proof"
-                    className="w-full rounded-lg border border-gray-600"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons for Pending Requests */}
-            {selectedRequest.status === 'PENDING' && (
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowDetails(false);
-                    setShowApproveModal(true);
-                  }}
-                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDetails(false);
-                    setShowRejectModal(true);
-                  }}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
-                >
-                  Reject
-                </button>
+            {selectedRequest.userEmail && (
+              <div className="flex justify-between">
+                <span className="text-gray-300">Email:</span>
+                <span className="text-white">{selectedRequest.userEmail}</span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Deposit Info */}
+        <div className="bg-gray-700 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-gray-400 mb-2">Deposit Details</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-300">Amount:</span>
+              <span className="text-white font-bold">৳{selectedRequest.amount}</span>
+            </div>
+            {(selectedRequest.bonusAmount ?? 0) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-300">Bonus:</span>
+                <span className="text-green-400">+ ৳{selectedRequest.bonusAmount}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-300">Total:</span>
+              <span className="text-white font-bold">
+                ৳{selectedRequest.amount + (selectedRequest.bonusAmount || 0)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Method:</span>
+              <span className="text-white">{selectedRequest.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Type:</span>
+              <span className="text-white capitalize">{selectedRequest.depositType}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Info */}
+        <div className="bg-gray-700 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-gray-400 mb-2">Status</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-300">Status:</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                getStatusBadge(selectedRequest.status).bg
+              } ${getStatusBadge(selectedRequest.status).text}`}>
+                {getStatusBadge(selectedRequest.status).icon}
+                {getStatusBadge(selectedRequest.status).label}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Date:</span>
+              <span className="text-white text-sm">{formatDate(selectedRequest.createdAt)}</span>
+            </div>
+            {selectedRequest.processedAt && (
+              <div className="flex justify-between">
+                <span className="text-gray-300">Processed:</span>
+                <span className="text-white text-sm">{formatDate(selectedRequest.processedAt)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Form Data - Dynamic Fields */}
+        {selectedRequest.formData && Object.keys(selectedRequest.formData).length > 0 && (
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-400 mb-2">Form Data</h4>
+            <div className="space-y-2">
+              {Object.entries(selectedRequest.formData).map(([key, value]) => {
+                // Skip empty values
+                if (!value) return null;
+                
+                // Check if it's a screenshot URL
+                const isScreenshot = typeof value === 'string' && 
+                  (value.startsWith('http') && value.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+                
+                return (
+                  <div key={key} className="border-b border-gray-600 pb-2 last:border-0">
+                    <div className="flex justify-between items-start gap-4">
+                      <span className="text-gray-300 capitalize font-medium min-w-[100px]">
+                        {key.replace(/_/g, ' ')}:
+                      </span>
+                      <div className="flex-1 text-right">
+                        {isScreenshot ? (
+                          <div className="relative group">
+                            <img
+                              src={value as string}
+                              alt={key}
+                              className="max-h-32 rounded-lg border border-gray-600 mx-auto cursor-pointer hover:opacity-90 transition"
+                              onClick={() => window.open(value as string, '_blank')}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-white break-words">{value as string}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Promotion Details */}
+        {selectedRequest.promotionName && (
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-400 mb-2">Promotion Applied</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-300">Promotion:</span>
+                <span className="text-pink-400">{selectedRequest.promotionName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Value:</span>
+                <span className="text-white">
+                  {selectedRequest.promotionType === 'PERCENT' 
+                    ? `${selectedRequest.promotionValue}%` 
+                    : `৳${selectedRequest.promotionValue}`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Bonus Given:</span>
+                <span className="text-green-400">৳{selectedRequest.bonusAmount}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Note */}
+        {selectedRequest.adminNote && (
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-400 mb-2">Admin Note</h4>
+            <p className="text-white">{selectedRequest.adminNote}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons for Pending Requests */}
+      {selectedRequest.status === 'PENDING' && (
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={() => {
+              setShowDetails(false);
+              setShowApproveModal(true);
+            }}
+            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
+          >
+            Approve
+          </button>
+          <button
+            onClick={() => {
+              setShowDetails(false);
+              setShowRejectModal(true);
+            }}
+            className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
+          >
+            Reject
+          </button>
+        </div>
       )}
+    </div>
+  </div>
+)}
 
       {/* Approve Modal */}
       {showApproveModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-white mb-4">Approve Deposit Request</h3>
             <p className="text-gray-300 mb-4">
@@ -688,7 +672,7 @@ export default function AdminDepositRequests() {
 
       {/* Reject Modal */}
       {showRejectModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-white mb-4">Reject Deposit Request</h3>
             <p className="text-gray-300 mb-4">

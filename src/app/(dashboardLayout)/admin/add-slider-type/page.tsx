@@ -2,21 +2,18 @@
 // app/(dashboard)/slider/create-type/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { sliderTypeService } from "@/services/api/slider.types";
+import { SliderTypeData, sliderTypeService } from "@/services/api/slider.types";
 import { uploadImageToImageBB } from "@/lib/imageUpload";
 import toast from "react-hot-toast";
 import {
     ArrowLeft,
-    Link2,
     Upload,
     Type,
-    FileText,
     Image as ImageIcon,
     Eye,
-    Check,
     AlertCircle,
     X,
     Camera,
@@ -25,6 +22,32 @@ import {
     Save,
     RefreshCw
 } from "lucide-react";
+import { oracleService } from "@/services/api/oracel.service";
+
+type OracleProvider = {
+    _id: string;
+    providerCode: string;
+    providerName: string;
+    gameType: string;
+};
+
+type OracleProviderResponse = {
+    success: boolean;
+    count: number;
+    data: OracleProvider[];
+};
+
+const sliderTypeToGameTypeMap: Record<string, string[]> = {
+    hot: ["SLOT", "CASINO", "FISHING"],
+    "recent-views": [],
+    "slot-game": ["SLOT"],
+    live: ["CASINO"],
+    "fishing-game": ["FISHING"],
+    lottory: ["LOTTERY"],
+    sport: ["SPORTS"],
+    "table-game": ["CASINO"],
+    promotion: []
+};
 
 const CreateSliderTypePage = () => {
     const router = useRouter();
@@ -39,7 +62,63 @@ const CreateSliderTypePage = () => {
     const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [providers, setProviders] = useState<OracleProvider[]>([]);
+    const [selectedProviderCodes, setSelectedProviderCodes] = useState<string[]>([]);
+    
+    useEffect(() => {
+        const fetchProviders = async () => {
+            try {
+                const response = await oracleService.getProviders() as OracleProviderResponse;
+                setProviders(response?.data || []);
+            } catch (error) {
+                console.error("Failed to fetch providers:", error);
+            }
+        };
+        fetchProviders();
+    }, []);
 
+    const selectedSliderType = formData.name;
+    const shouldMatchProviders = selectedSliderType !== "home" && selectedSliderType !== "hero";
+
+    const matchedProviders = shouldMatchProviders
+        ? providers.filter((provider) => {
+            const gameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
+            if (!gameTypes.length) return false;
+
+            const providerTypes = provider.gameType
+                .split(",")
+                .map((type) => type.trim().toUpperCase());
+
+            return gameTypes.some((type) => providerTypes.includes(type));
+        })
+        : [];
+
+    const providerSelectionPool = shouldMatchProviders
+        ? (() => {
+            const gameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
+            return gameTypes.length ? matchedProviders : providers;
+        })()
+        : [];
+
+    useEffect(() => {
+        setSelectedProviderCodes([]);
+    }, [selectedSliderType]);
+
+    const toggleProviderSelection = (providerCode: string) => {
+        setSelectedProviderCodes((prev) =>
+            prev.includes(providerCode)
+                ? prev.filter((code) => code !== providerCode)
+                : [...prev, providerCode]
+        );
+    };
+
+    const selectAllProviders = () => {
+        setSelectedProviderCodes(providerSelectionPool.map((provider) => provider.providerCode));
+    };
+
+    const clearSelectedProviders = () => {
+        setSelectedProviderCodes([]);
+    };
     const sliderTypeOptions = [
         { id: "home", label: "Home", icon: "🏠" },
         { id: "hero", label: "Hero", icon: "⭐" },
@@ -76,7 +155,7 @@ const CreateSliderTypePage = () => {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        
+
         const error = validateField(name, value);
         setErrors(prev => ({ ...prev, [name]: error }));
     };
@@ -133,9 +212,40 @@ const CreateSliderTypePage = () => {
             return;
         }
 
+        if (shouldMatchProviders && providerSelectionPool.length > 0 && selectedProviderCodes.length === 0) {
+            toast.error('Please select at least one provider');
+            return;
+        }
+
         try {
             setLoading(true);
-            await sliderTypeService.createSliderType(formData);
+            const selectedProviders = providerSelectionPool.filter((provider) =>
+                selectedProviderCodes.includes(provider.providerCode)
+            );
+
+            const uniqueGameTypes = Array.from(
+                new Set(
+                    selectedProviders.flatMap((provider) =>
+                        provider.gameType
+                            .split(",")
+                            .map((type) => type.trim().toUpperCase())
+                            .filter(Boolean)
+                    )
+                )
+            );
+
+            const payload: SliderTypeData = {
+                ...formData,
+                gameType: uniqueGameTypes.length ? uniqueGameTypes.join(",") : undefined,
+                providerCode: selectedProviders.length
+                    ? selectedProviders.map((provider) => provider.providerCode).join(",")
+                    : undefined,
+                providerName: selectedProviders.length
+                    ? selectedProviders.map((provider) => provider.providerName).join(",")
+                    : undefined
+            };
+
+            await sliderTypeService.createSliderType(payload);
             toast.success('Slider type created successfully!');
             router.push('/admin/slider-controll');
         } catch (error: any) {
@@ -170,7 +280,7 @@ const CreateSliderTypePage = () => {
                         </div>
                         <span>Back to Slider Management</span>
                     </Link>
-                    
+
                     <div className="flex items-center gap-4">
                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-yellow-500/30">
                             <FolderOpen className="w-7 h-7 text-yellow-500" />
@@ -210,11 +320,10 @@ const CreateSliderTypePage = () => {
                                         value={formData.name}
                                         onChange={handleInputChange}
                                         onBlur={() => handleBlur('name')}
-                                        className={`w-full appearance-none px-4 py-3 rounded-xl bg-gray-900/50 border ${
-                                            touched.name && errors.name
+                                        className={`w-full appearance-none px-4 py-3 rounded-xl bg-gray-900/50 border ${touched.name && errors.name
                                                 ? 'border-red-500/50 focus:border-red-500'
                                                 : 'border-gray-700 focus:border-yellow-500/50'
-                                        } text-white focus:outline-none transition-colors cursor-pointer`}
+                                            } text-white focus:outline-none transition-colors cursor-pointer`}
                                     >
                                         <option value="" className="bg-gray-900">Select a slider type</option>
                                         {sliderTypeOptions.map((type) => (
@@ -238,6 +347,68 @@ const CreateSliderTypePage = () => {
                                 <p className="text-xs text-gray-500 mt-1">
                                     Choose one predefined slider type for your sliders
                                 </p>
+
+                                {selectedSliderType && shouldMatchProviders && (
+                                    <div className="mt-3 rounded-xl border border-gray-700 bg-gray-900/40 p-4">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-sm font-medium text-gray-200">Select Providers</p>
+                                            <span className="text-xs px-2 py-1 rounded-md bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                                {selectedProviderCodes.length}/{providerSelectionPool.length}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={selectAllProviders}
+                                                className="text-xs px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors"
+                                            >
+                                                Select All
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={clearSelectedProviders}
+                                                className="text-xs px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+
+                                        {providerSelectionPool.length > 0 ? (
+                                            <div className="mt-3 flex flex-wrap gap-2 max-h-40 overflow-auto pr-1">
+                                                {providerSelectionPool.map((provider) => {
+                                                    const isSelected = selectedProviderCodes.includes(provider.providerCode);
+
+                                                    return (
+                                                    <button
+                                                        type="button"
+                                                        key={provider._id}
+                                                        onClick={() => toggleProviderSelection(provider.providerCode)}
+                                                        className={`text-xs px-2 py-1 rounded-md border transition-colors ${isSelected
+                                                            ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300'
+                                                            : 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700'
+                                                            }`}
+                                                    >
+                                                        {provider.providerName}
+                                                    </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="mt-2 text-xs text-gray-400">
+                                                No providers available for this slider type.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {selectedSliderType && !shouldMatchProviders && (
+                                    <div className="mt-3 rounded-xl border border-gray-700 bg-gray-900/40 p-3">
+                                        <p className="text-xs text-gray-400">
+                                            Provider matching is not required for Home and Hero.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Description */}
@@ -272,11 +443,10 @@ const CreateSliderTypePage = () => {
                                 <button
                                     type="button"
                                     onClick={() => setUploadMethod("file")}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                                        uploadMethod === "file"
+                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${uploadMethod === "file"
                                             ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
                                             : "bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700"
-                                    }`}
+                                        }`}
                                 >
                                     <Upload className="w-4 h-4" />
                                     <span>Upload File</span>
@@ -284,11 +454,10 @@ const CreateSliderTypePage = () => {
                                 <button
                                     type="button"
                                     onClick={() => setUploadMethod("url")}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                                        uploadMethod === "url"
+                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${uploadMethod === "url"
                                             ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
                                             : "bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700"
-                                    }`}
+                                        }`}
                                 >
                                     <Globe className="w-4 h-4" />
                                     <span>Image URL</span>
@@ -330,11 +499,10 @@ const CreateSliderTypePage = () => {
                                             value={formData.iconUrl}
                                             onChange={handleInputChange}
                                             onBlur={() => handleBlur('iconUrl')}
-                                            className={`w-full pl-10 pr-10 py-3 rounded-xl bg-gray-900/50 border ${
-                                                touched.iconUrl && errors.iconUrl
+                                            className={`w-full pl-10 pr-10 py-3 rounded-xl bg-gray-900/50 border ${touched.iconUrl && errors.iconUrl
                                                     ? 'border-red-500/50 focus:border-red-500'
                                                     : 'border-gray-700 focus:border-yellow-500/50'
-                                            } text-white placeholder-gray-500 focus:outline-none transition-colors`}
+                                                } text-white placeholder-gray-500 focus:outline-none transition-colors`}
                                             placeholder="https://example.com/icon.png"
                                         />
                                         {formData.iconUrl && (
@@ -408,7 +576,7 @@ const CreateSliderTypePage = () => {
                                 <div>
                                     <p className="text-white font-medium">Active Status</p>
                                     <p className="text-sm text-gray-400 mt-1">
-                                        {formData.isActive 
+                                        {formData.isActive
                                             ? 'This slider type will be visible immediately'
                                             : 'This slider type will be saved as inactive'
                                         }
@@ -417,14 +585,12 @@ const CreateSliderTypePage = () => {
                                 <button
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}
-                                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none ${
-                                        formData.isActive ? 'bg-green-500' : 'bg-gray-600'
-                                    }`}
+                                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none ${formData.isActive ? 'bg-green-500' : 'bg-gray-600'
+                                        }`}
                                 >
                                     <span
-                                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                                            formData.isActive ? 'translate-x-8' : 'translate-x-1'
-                                        }`}
+                                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.isActive ? 'translate-x-8' : 'translate-x-1'
+                                            }`}
                                     />
                                 </button>
                             </div>
@@ -450,7 +616,7 @@ const CreateSliderTypePage = () => {
                                 </>
                             )}
                         </button>
-                        
+
                         <button
                             type="button"
                             onClick={handleCancel}
@@ -473,7 +639,7 @@ const CreateSliderTypePage = () => {
                             <li>• You can create multiple sliders under one type</li>
                         </ul>
                     </div>
-                    
+
                     <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
                         <h3 className="text-sm font-medium text-purple-400 mb-2">📋 Next Steps</h3>
                         <ul className="text-xs text-purple-300/70 space-y-1">

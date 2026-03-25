@@ -2,17 +2,22 @@
 import api from "../api";
 
 export interface Promotion {
-  iconUrl: string;
   _id: string;
-  tab: string; // manual, auto, crypto
+  tab: string;
   bonusName: string;
   type: 'PERCENT' | 'FIXED';
   value: number;
   minDeposit?: number;
-  maxBonus?: number;
+  maxBonus?: number; // ✅ NEW
+  paymentMethodId?: {  // ✅ NEW
+    _id: string;
+    name: string;
+    icon?: string;
+  } | string;
   isActive: boolean;
   startDate?: string;
   endDate?: string;
+  iconUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -23,10 +28,12 @@ export interface PromotionData {
   type: 'PERCENT' | 'FIXED';
   value: number;
   minDeposit?: number;
-  maxBonus?: number;
+  maxBonus?: number; // ✅ NEW
+  paymentMethodId?: string; // ✅ NEW
   isActive?: boolean;
   startDate?: string;
   endDate?: string;
+  iconUrl?: string;
 }
 
 export const promotionService = {
@@ -36,9 +43,15 @@ export const promotionService = {
     return response?.data;
   },
 
-  // Get promotions by tab (for frontend display)
+  // Get promotions by tab
   async getPromotionsByTab(tab: string) {
     const response = await api.get(`/promotions/tab/${tab}`);
+    return response?.data;
+  },
+
+  // Get promotions by payment method
+  async getPromotionsByPaymentMethod(paymentMethodId: string) {
+    const response = await api.get(`/promotions/payment-method/${paymentMethodId}`);
     return response?.data;
   },
 

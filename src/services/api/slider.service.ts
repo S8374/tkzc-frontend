@@ -10,6 +10,11 @@ export interface SliderData {
   buttonText?: string;
   buttonLink?: string;
   imageRedirectLink: string;
+  money?: number;
+  username?: string;
+  provider_code?: string;
+  game_code?: string;
+  game_type?: string;
   order: number;
 }
 

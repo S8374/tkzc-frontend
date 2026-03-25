@@ -205,4 +205,10 @@ export const depositService = {
     const response = await api.get(`/payment-methods/tittle/${id}`);
     return response?.data;
   },
+
+
+  async getInstructionsByPaymentMethod(paymentMethodId: string) {
+  const response = await api.get(`/payment-methods/instruction/payment-method/${paymentMethodId}`);
+  return response?.data;
+}
 };

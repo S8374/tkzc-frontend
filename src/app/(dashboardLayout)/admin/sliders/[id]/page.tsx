@@ -238,7 +238,6 @@ export default function EditSliderPage() {
                             <Edit3 className="w-8 h-8 text-yellow-500 animate-pulse" />
                         </div>
                     </div>
-                    <p className="text-gray-400 mt-4">Loading slider data...</p>
                 </div>
             </div>
         );

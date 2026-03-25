@@ -2,11 +2,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Power, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Power,
   CreditCard,
   BookOpen,
   FileText,
@@ -21,9 +21,7 @@ import {
   Loader2,
   Star,
   Type,
-  Copy,
-  Eye,
-  EyeOff
+  Copy
 } from "lucide-react";
 import { depositService } from "@/services/api/deposit.service";
 import { promotionService, Promotion } from "@/services/api/promotion.service";
@@ -46,9 +44,9 @@ interface Instruction {
   step: number;
   text: string;
   tab: TabType;
+  paymentMethodId?: string; // Add this field
   isActive: boolean;
 }
-
 interface FormField {
   _id: string;
   label: string;
@@ -95,7 +93,7 @@ export default function DepositManagement() {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [tittles, setTittles] = useState<Tittle[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Modal states
   const [showMethodModal, setShowMethodModal] = useState(false);
   const [showInstructionModal, setShowInstructionModal] = useState(false);
@@ -103,15 +101,15 @@ export default function DepositManagement() {
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showTittleModal, setShowTittleModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-  
+
   // Upload states for payment method icon
   const [uploadingMethodIcon, setUploadingMethodIcon] = useState(false);
   const [methodIconUploadStatus, setMethodIconUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  
+
   // Upload states for promotion icon
   const [uploadingPromoIcon, setUploadingPromoIcon] = useState(false);
   const [promoIconUploadStatus, setPromoIconUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  
+
   // Form states
   const [methodForm, setMethodForm] = useState({
     name: '',
@@ -125,6 +123,7 @@ export default function DepositManagement() {
   const [instructionForm, setInstructionForm] = useState({
     step: 1,
     text: '',
+    paymentMethodId: undefined as string | undefined, // Add this
     isActive: true
   });
 
@@ -147,6 +146,8 @@ export default function DepositManagement() {
     type: 'PERCENT' as 'PERCENT' | 'FIXED',
     value: 0,
     minDeposit: undefined as number | undefined,
+    maxBonus: undefined as number | undefined,
+    paymentMethodId: undefined as string | undefined,
     iconUrl: '',
     isActive: true,
     startDate: '',
@@ -177,7 +178,7 @@ export default function DepositManagement() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch payment methods for this tab
       const methodsRes = await depositService.getPaymentMethodByTab(activeTab);
       if (methodsRes?.success) {
@@ -226,7 +227,7 @@ export default function DepositManagement() {
     });
 
     const data = await response.json();
-    
+
     if (data.success) {
       return data.data.url;
     } else {
@@ -242,12 +243,12 @@ export default function DepositManagement() {
     try {
       setUploadingMethodIcon(true);
       setMethodIconUploadStatus('uploading');
-      
+
       const imageUrl = await uploadImageToImageBB(file);
-      
+
       setMethodForm(prev => ({ ...prev, icon: imageUrl }));
       setMethodIconUploadStatus('success');
-      
+
       setTimeout(() => setMethodIconUploadStatus('idle'), 3000);
     } catch (error) {
       console.error("Error uploading icon:", error);
@@ -266,12 +267,12 @@ export default function DepositManagement() {
     try {
       setUploadingPromoIcon(true);
       setPromoIconUploadStatus('uploading');
-      
+
       const imageUrl = await uploadImageToImageBB(file);
-      
+
       setPromotionForm(prev => ({ ...prev, iconUrl: imageUrl }));
       setPromoIconUploadStatus('success');
-      
+
       setTimeout(() => setPromoIconUploadStatus('idle'), 3000);
     } catch (error) {
       console.error("Error uploading icon:", error);
@@ -290,10 +291,10 @@ export default function DepositManagement() {
         return;
       }
 
-      const slug = methodForm.slug 
+      const slug = methodForm.slug
         ? generateSlug(methodForm.slug)
         : generateSlug(methodForm.name);
-      
+
       if (!slug) {
         alert("Invalid slug generated. Please check the name.");
         return;
@@ -314,9 +315,9 @@ export default function DepositManagement() {
       alert("Payment method created successfully!");
     } catch (error: any) {
       console.error("Error creating payment method:", error);
-      
-      if (error.response?.data?.message?.includes("duplicate key") || 
-          error.message?.includes("duplicate key")) {
+
+      if (error.response?.data?.message?.includes("duplicate key") ||
+        error.message?.includes("duplicate key")) {
         alert(`A payment method with slug "${generateSlug(methodForm.slug || methodForm.name)}" already exists. Please use a different name.`);
       } else {
         alert("Failed to create payment method. Please try again.");
@@ -327,10 +328,10 @@ export default function DepositManagement() {
   const handleUpdateMethod = async () => {
     if (!editingItem) return;
     try {
-      const slug = methodForm.slug 
+      const slug = methodForm.slug
         ? generateSlug(methodForm.slug)
         : generateSlug(methodForm.name);
-      
+
       await depositService.updatePaymentMethod(editingItem._id, {
         name: methodForm.name,
         slug: slug,
@@ -346,7 +347,7 @@ export default function DepositManagement() {
       alert("Payment method updated successfully!");
     } catch (error: any) {
       console.error("Error updating payment method:", error);
-      
+
       if (error.response?.data?.message?.includes("duplicate key")) {
         alert(`A payment method with slug "${generateSlug(methodForm.slug || methodForm.name)}" already exists. Please use a different name.`);
       } else {
@@ -380,17 +381,42 @@ export default function DepositManagement() {
   };
 
   // ========== INSTRUCTION HANDLERS ==========
+  // ========== INSTRUCTION HANDLERS ==========
   const handleCreateInstruction = async () => {
     try {
-      await depositService.createInstruction({
-        ...instructionForm,
-        tab: activeTab
-      });
+      if (!instructionForm.text) {
+        alert("Please enter instruction text");
+        return;
+      }
+
+      const instructionData: any = {
+        step: instructionForm.step,
+        text: instructionForm.text,
+        tab: activeTab,
+        isActive: instructionForm.isActive
+      };
+
+      // Add paymentMethodId if selected
+      if (instructionForm.paymentMethodId && instructionForm.paymentMethodId.trim() !== '') {
+        // Validate payment method exists and belongs to current tab
+        const selectedMethod = paymentMethods.find(m => m._id === instructionForm.paymentMethodId);
+        if (!selectedMethod) {
+          alert("Selected payment method not found");
+          return;
+        }
+        if (selectedMethod.tab !== activeTab) {
+          alert(`Payment method "${selectedMethod.name}" belongs to tab "${selectedMethod.tab}", not "${activeTab}"`);
+          return;
+        }
+        instructionData.paymentMethodId = instructionForm.paymentMethodId;
+      }
+
+      await depositService.createInstruction(instructionData);
       setShowInstructionModal(false);
       resetInstructionForm();
       fetchData();
       alert("Instruction created successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating instruction:", error);
       alert("Failed to create instruction");
     }
@@ -399,13 +425,42 @@ export default function DepositManagement() {
   const handleUpdateInstruction = async () => {
     if (!editingItem) return;
     try {
-      await depositService.updateInstruction(editingItem._id, instructionForm);
+      if (!instructionForm.text) {
+        alert("Please enter instruction text");
+        return;
+      }
+
+      const instructionData: any = {
+        step: instructionForm.step,
+        text: instructionForm.text,
+        isActive: instructionForm.isActive
+      };
+
+      // Add paymentMethodId if selected (handle removal if undefined)
+      if (instructionForm.paymentMethodId && instructionForm.paymentMethodId.trim() !== '') {
+        // Validate payment method exists and belongs to current tab
+        const selectedMethod = paymentMethods.find(m => m._id === instructionForm.paymentMethodId);
+        if (!selectedMethod) {
+          alert("Selected payment method not found");
+          return;
+        }
+        if (selectedMethod.tab !== activeTab) {
+          alert(`Payment method "${selectedMethod.name}" belongs to tab "${selectedMethod.tab}", not "${activeTab}"`);
+          return;
+        }
+        instructionData.paymentMethodId = instructionForm.paymentMethodId;
+      } else {
+        // If no payment method selected, set to null to remove the link
+        instructionData.paymentMethodId = null;
+      }
+
+      await depositService.updateInstruction(editingItem._id, instructionData);
       setShowInstructionModal(false);
       setEditingItem(null);
       resetInstructionForm();
       fetchData();
       alert("Instruction updated successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating instruction:", error);
       alert("Failed to update instruction");
     }
@@ -466,7 +521,7 @@ export default function DepositManagement() {
         staticValue: fieldForm.staticValue,
         isCopyable: fieldForm.isCopyable
       };
-     console.log("Creating form field with data:", fieldData);
+
       if (fieldForm.paymentMethodId && fieldForm.paymentMethodId.trim() !== '') {
         fieldData.paymentMethodId = fieldForm.paymentMethodId;
       }
@@ -479,10 +534,8 @@ export default function DepositManagement() {
     } catch (error: any) {
       console.error("Error creating form field:", error);
       if (error.response?.data?.message?.includes("Bonus field already exists")) {
-        console.error("Bonus field creation error:", error);
         alert(error.response.data.message);
       } else {
-        console.error("General form field creation error:", error);
         alert("Failed to create form field. Please try again.");
       }
     }
@@ -499,7 +552,7 @@ export default function DepositManagement() {
 
       // Check if trying to make this a bonus field when another bonus field exists
       if (fieldForm.isBonusField) {
-        const existingBonusField = formFields.find(f => 
+        const existingBonusField = formFields.find(f =>
           f.isBonusField === true && f._id !== editingItem._id
         );
         if (existingBonusField) {
@@ -533,7 +586,7 @@ export default function DepositManagement() {
       alert("Form field updated successfully!");
     } catch (error: any) {
       console.error("Error updating form field:", error);
-      
+
       if (error.response?.data?.message?.includes("Bonus field already exists")) {
         alert(error.response.data.message);
       } else {
@@ -569,50 +622,177 @@ export default function DepositManagement() {
   // ========== PROMOTION HANDLERS ==========
   const handleCreatePromotion = async () => {
     try {
+      // Validate required fields
+      if (!promotionForm.bonusName) {
+        alert("Please enter a bonus name");
+        return;
+      }
+
+      if (promotionForm.value <= 0) {
+        alert("Bonus value must be greater than 0");
+        return;
+      }
+
+      if (promotionForm.maxBonus && promotionForm.maxBonus < 0) {
+        alert("Maximum bonus cannot be negative");
+        return;
+      }
+
+      // If payment method is selected, validate it exists and belongs to current tab
+      if (promotionForm.paymentMethodId) {
+        const selectedMethod = paymentMethods.find(m => m._id === promotionForm.paymentMethodId);
+        if (!selectedMethod) {
+          alert("Selected payment method not found");
+          return;
+        }
+
+        if (selectedMethod.tab !== activeTab) {
+          alert(`Payment method "${selectedMethod.name}" belongs to tab "${selectedMethod.tab}", not "${activeTab}"`);
+          return;
+        }
+      }
+
       const createData: any = {
-        ...promotionForm,
-        tab: activeTab,
+        bonusName: promotionForm.bonusName,
+        type: promotionForm.type,
         value: Number(promotionForm.value),
-        minDeposit: promotionForm.minDeposit ? Number(promotionForm.minDeposit) : undefined
+        tab: activeTab,
+        isActive: promotionForm.isActive
       };
-      
+
+      if (promotionForm.minDeposit) {
+        createData.minDeposit = Number(promotionForm.minDeposit);
+      }
+
+      if (promotionForm.maxBonus) {
+        createData.maxBonus = Number(promotionForm.maxBonus);
+      }
+
+      if (promotionForm.paymentMethodId) {
+        createData.paymentMethodId = promotionForm.paymentMethodId;
+      }
+
       if (promotionForm.iconUrl) {
         createData.iconUrl = promotionForm.iconUrl;
       }
-      
+
+      if (promotionForm.startDate) {
+        createData.startDate = promotionForm.startDate;
+      }
+
+      if (promotionForm.endDate) {
+        createData.endDate = promotionForm.endDate;
+      }
+
+      console.log("Creating promotion with data:", createData);
+
       await promotionService.createPromotion(createData);
       setShowPromotionModal(false);
       resetPromotionForm();
       fetchData();
       alert("Promotion created successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating promotion:", error);
-      alert("Failed to create promotion");
+
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      } else if (error.message) {
+        alert(error.message);
+      } else {
+        alert("Failed to create promotion. Please try again.");
+      }
     }
   };
 
   const handleUpdatePromotion = async () => {
     if (!editingItem) return;
+
     try {
+      // Validate required fields
+      if (!promotionForm.bonusName) {
+        alert("Please enter a bonus name");
+        return;
+      }
+
+      if (promotionForm.value <= 0) {
+        alert("Bonus value must be greater than 0");
+        return;
+      }
+
+      if (promotionForm.maxBonus && promotionForm.maxBonus < 0) {
+        alert("Maximum bonus cannot be negative");
+        return;
+      }
+
+      // If payment method is selected, validate it exists and belongs to current tab
+      if (promotionForm.paymentMethodId) {
+        const selectedMethod = paymentMethods.find(m => m._id === promotionForm.paymentMethodId);
+        if (!selectedMethod) {
+          alert("Selected payment method not found");
+          return;
+        }
+
+        if (selectedMethod.tab !== activeTab) {
+          alert(`Payment method "${selectedMethod.name}" belongs to tab "${selectedMethod.tab}", not "${activeTab}"`);
+          return;
+        }
+      }
+
       const updateData: any = {
-        ...promotionForm,
+        bonusName: promotionForm.bonusName,
+        type: promotionForm.type,
         value: Number(promotionForm.value),
-        minDeposit: promotionForm.minDeposit ? Number(promotionForm.minDeposit) : undefined
+        isActive: promotionForm.isActive
       };
-      
+
+      if (promotionForm.minDeposit !== undefined) {
+        updateData.minDeposit = promotionForm.minDeposit ? Number(promotionForm.minDeposit) : null;
+      }
+
+      if (promotionForm.maxBonus !== undefined) {
+        updateData.maxBonus = promotionForm.maxBonus ? Number(promotionForm.maxBonus) : null;
+      }
+
+      if (promotionForm.paymentMethodId !== undefined) {
+        updateData.paymentMethodId = promotionForm.paymentMethodId || null;
+      }
+
       if (promotionForm.iconUrl) {
         updateData.iconUrl = promotionForm.iconUrl;
+      } else {
+        updateData.iconUrl = null;
       }
-      
+
+      if (promotionForm.startDate) {
+        updateData.startDate = promotionForm.startDate;
+      } else {
+        updateData.startDate = null;
+      }
+
+      if (promotionForm.endDate) {
+        updateData.endDate = promotionForm.endDate;
+      } else {
+        updateData.endDate = null;
+      }
+
+      console.log("Updating promotion with data:", updateData);
+
       await promotionService.updatePromotion(editingItem._id, updateData);
       setShowPromotionModal(false);
       setEditingItem(null);
       resetPromotionForm();
       fetchData();
       alert("Promotion updated successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating promotion:", error);
-      alert("Failed to update promotion");
+
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      } else if (error.message) {
+        alert(error.message);
+      } else {
+        alert("Failed to update promotion. Please try again.");
+      }
     }
   };
 
@@ -727,11 +907,11 @@ export default function DepositManagement() {
     });
     setMethodIconUploadStatus('idle');
   };
-
   const resetInstructionForm = () => {
     setInstructionForm({
       step: instructions.length + 1,
       text: '',
+      paymentMethodId: undefined,
       isActive: true
     });
   };
@@ -758,6 +938,8 @@ export default function DepositManagement() {
       type: 'PERCENT',
       value: 0,
       minDeposit: undefined,
+      maxBonus: undefined,
+      paymentMethodId: undefined,
       iconUrl: '',
       isActive: true,
       startDate: '',
@@ -792,6 +974,7 @@ export default function DepositManagement() {
     setInstructionForm({
       step: instruction.step,
       text: instruction.text,
+      paymentMethodId: instruction.paymentMethodId,
       isActive: instruction.isActive
     });
     setShowInstructionModal(true);
@@ -817,11 +1000,24 @@ export default function DepositManagement() {
 
   const openEditPromotion = (promotion: Promotion) => {
     setEditingItem(promotion);
+
+    // Handle paymentMethodId which could be an object or string
+    let paymentMethodId = undefined;
+    if (promotion.paymentMethodId) {
+      if (typeof promotion.paymentMethodId === 'object') {
+        paymentMethodId = promotion.paymentMethodId._id;
+      } else {
+        paymentMethodId = promotion.paymentMethodId;
+      }
+    }
+
     setPromotionForm({
       bonusName: promotion.bonusName,
       type: promotion.type,
       value: promotion.value,
       minDeposit: promotion.minDeposit,
+      maxBonus: promotion.maxBonus,
+      paymentMethodId: paymentMethodId,
       iconUrl: promotion.iconUrl || '',
       isActive: promotion.isActive,
       startDate: promotion.startDate ? new Date(promotion.startDate).toISOString().split('T')[0] : '',
@@ -878,11 +1074,10 @@ export default function DepositManagement() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`py-3 text-sm font-semibold rounded-lg transition-all ${
-                  activeTab === tab
-                    ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
-                    : "text-gray-400 hover:text-white hover:bg-black/30"
-                }`}
+                className={`py-3 text-sm font-semibold rounded-lg transition-all ${activeTab === tab
+                  ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
+                  : "text-gray-400 hover:text-white hover:bg-black/30"
+                  }`}
               >
                 {tabLabels[tab]}
               </button>
@@ -918,9 +1113,8 @@ export default function DepositManagement() {
               {tittles.map((tittle) => (
                 <div
                   key={tittle._id}
-                  className={`bg-gray-700 rounded-lg p-4 border ${
-                    tittle.isActive ? 'border-indigo-600/50' : 'border-gray-600'
-                  }`}
+                  className={`bg-gray-700 rounded-lg p-4 border ${tittle.isActive ? 'border-indigo-600/50' : 'border-gray-600'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -937,9 +1131,8 @@ export default function DepositManagement() {
                     <div className="flex gap-2 ml-4">
                       <button
                         onClick={() => handleToggleTittleActive(tittle)}
-                        className={`p-2 rounded-lg ${
-                          tittle.isActive ? 'bg-green-600' : 'bg-gray-600'
-                        }`}
+                        className={`p-2 rounded-lg ${tittle.isActive ? 'bg-green-600' : 'bg-gray-600'
+                          }`}
                       >
                         <Power className="w-4 h-4 text-white" />
                       </button>
@@ -978,124 +1171,7 @@ export default function DepositManagement() {
             </div>
           </div>
 
-          {/* Promotions / Bonuses Section */}
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Gift className="w-5 h-5 text-pink-500" />
-                Promotions & Bonuses
-              </h2>
-              <button
-                onClick={() => {
-                  setEditingItem(null);
-                  resetPromotionForm();
-                  setShowPromotionModal(true);
-                }}
-                className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg"
-              >
-                <Plus className="w-4 h-4" />
-                Add Bonus
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {promotions.map((promotion) => (
-                <div
-                  key={promotion._id}
-                  className={`bg-gray-700 rounded-lg p-4 border ${
-                    promotion.isActive ? 'border-pink-600/50' : 'border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        {promotion.iconUrl ? (
-                          <img 
-                            src={promotion.iconUrl} 
-                            alt={promotion.bonusName} 
-                            className="w-10 h-10 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-pink-600/20 flex items-center justify-center">
-                            <Gift className="w-5 h-5 text-pink-400" />
-                          </div>
-                        )}
-                        <div>
-                          <h3 className="text-white font-semibold">{promotion.bonusName}</h3>
-                          <div className="flex items-center gap-2">
-                            {promotion.type === 'PERCENT' ? (
-                              <Percent className="w-3 h-3 text-blue-400" />
-                            ) : (
-                              <DollarSign className="w-3 h-3 text-green-400" />
-                            )}
-                            <span className="text-sm font-bold text-white">
-                              {formatBonus(promotion)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1 text-sm">
-                        {promotion.minDeposit && (
-                          <p className="text-gray-300">
-                            Min Deposit: <span className="text-yellow-400">৳{promotion.minDeposit}</span>
-                          </p>
-                        )}
-                      </div>
-
-                      {(promotion.startDate || promotion.endDate) && (
-                        <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                          <Calendar className="w-3 h-3" />
-                          {promotion.startDate && <span>{new Date(promotion.startDate).toLocaleDateString()}</span>}
-                          {promotion.startDate && promotion.endDate && <span>-</span>}
-                          {promotion.endDate && <span>{new Date(promotion.endDate).toLocaleDateString()}</span>}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 ml-4">
-                      <button
-                        onClick={() => handleTogglePromotionActive(promotion)}
-                        className={`p-2 rounded-lg ${
-                          promotion.isActive ? 'bg-green-600' : 'bg-gray-600'
-                        }`}
-                      >
-                        <Power className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={() => openEditPromotion(promotion)}
-                        className="p-2 bg-blue-600 rounded-lg"
-                      >
-                        <Edit className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={() => handleDeletePromotion(promotion._id)}
-                        className="p-2 bg-red-600 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {promotions.length === 0 && (
-                <div className="col-span-2 text-center py-8 bg-gray-750 rounded-lg border border-dashed border-gray-600">
-                  <Gift className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400">No promotions for {tabLabels[activeTab]}</p>
-                  <button
-                    onClick={() => {
-                      setEditingItem(null);
-                      resetPromotionForm();
-                      setShowPromotionModal(true);
-                    }}
-                    className="mt-3 text-pink-400 hover:text-pink-300 text-sm"
-                  >
-                    + Add your first bonus
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Payment Methods Section */}
           <div>
@@ -1140,9 +1216,8 @@ export default function DepositManagement() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleToggleMethodActive(method)}
-                        className={`p-2 rounded-lg ${
-                          method.isActive ? 'bg-green-600' : 'bg-gray-600'
-                        }`}
+                        className={`p-2 rounded-lg ${method.isActive ? 'bg-green-600' : 'bg-gray-600'
+                          }`}
                       >
                         <Power className="w-4 h-4 text-white" />
                       </button>
@@ -1175,6 +1250,7 @@ export default function DepositManagement() {
           </div>
 
           {/* Instructions Section */}
+          {/* Instructions Section */}
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -1195,46 +1271,196 @@ export default function DepositManagement() {
             </div>
 
             <div className="space-y-3">
-              {instructions.sort((a, b) => a.step - b.step).map((instruction) => (
-                <div
-                  key={instruction._id}
-                  className="bg-gray-700 rounded-lg p-4 border border-gray-600 flex items-start justify-between"
-                >
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="bg-gray-600 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold">
-                      {instruction.step}
+              {instructions.sort((a, b) => a.step - b.step).map((instruction) => {
+                // Find linked payment method if any
+                const linkedMethod = instruction.paymentMethodId
+                  ? paymentMethods.find(m => m._id === instruction.paymentMethodId)
+                  : null;
+
+                return (
+                  <div
+                    key={instruction._id}
+                    className="bg-gray-700 rounded-lg p-4 border border-gray-600 flex items-start justify-between"
+                  >
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="bg-gray-600 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold">
+                        {instruction.step}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white">{instruction.text}</p>
+                        {linkedMethod && (
+                          <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                            <CreditCard className="w-3 h-3" />
+                            For: {linkedMethod.name}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-white flex-1">{instruction.text}</p>
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => handleToggleInstructionActive(instruction)}
+                        className={`p-2 rounded-lg ${instruction.isActive ? 'bg-green-600' : 'bg-gray-600'
+                          }`}
+                      >
+                        <Power className="w-4 h-4 text-white" />
+                      </button>
+                      <button
+                        onClick={() => openEditInstruction(instruction)}
+                        className="p-2 bg-blue-600 rounded-lg"
+                      >
+                        <Edit className="w-4 h-4 text-white" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteInstruction(instruction._id)}
+                        className="p-2 bg-red-600 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 ml-4">
-                    <button
-                      onClick={() => handleToggleInstructionActive(instruction)}
-                      className={`p-2 rounded-lg ${
-                        instruction.isActive ? 'bg-green-600' : 'bg-gray-600'
-                      }`}
-                    >
-                      <Power className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={() => openEditInstruction(instruction)}
-                      className="p-2 bg-blue-600 rounded-lg"
-                    >
-                      <Edit className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteInstruction(instruction._id)}
-                      className="p-2 bg-red-600 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {instructions.length === 0 && (
                 <p className="text-gray-400 text-center py-4">
                   No instructions for {tabLabels[activeTab]}
                 </p>
               )}
+            </div>
+
+            {/* Promotions / Bonuses Section */}
+            <div>
+              <div className="flex justify-between items-center mt-4 mb-4">
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-pink-500" />
+                  Promotions & Bonuses
+                </h2>
+                <button
+                  onClick={() => {
+                    setEditingItem(null);
+                    resetPromotionForm();
+                    setShowPromotionModal(true);
+                  }}
+                  className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Bonus
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {promotions.map((promotion) => {
+                  // Handle paymentMethodId which could be object or string
+                  const paymentMethod = typeof promotion.paymentMethodId === 'object'
+                    ? promotion.paymentMethodId
+                    : paymentMethods.find(m => m._id === promotion.paymentMethodId);
+
+                  return (
+                    <div
+                      key={promotion._id}
+                      className={`bg-gray-700 rounded-lg p-4 border ${promotion.isActive ? 'border-pink-600/50' : 'border-gray-600'
+                        }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {promotion.iconUrl ? (
+                              <img
+                                src={promotion.iconUrl}
+                                alt={promotion.bonusName}
+                                className="w-10 h-10 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-pink-600/20 flex items-center justify-center">
+                                <Gift className="w-5 h-5 text-pink-400" />
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="text-white font-semibold">{promotion.bonusName}</h3>
+                              <div className="flex items-center gap-2">
+                                {promotion.type === 'PERCENT' ? (
+                                  <Percent className="w-3 h-3 text-blue-400" />
+                                ) : (
+                                  <DollarSign className="w-3 h-3 text-green-400" />
+                                )}
+                                <span className="text-sm font-bold text-white">
+                                  {formatBonus(promotion)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 text-sm">
+                            {promotion.minDeposit && (
+                              <p className="text-gray-300">
+                                Min Deposit: <span className="text-yellow-400">৳{promotion.minDeposit}</span>
+                              </p>
+                            )}
+                            {promotion.maxBonus && (
+                              <p className="text-gray-300">
+                                Max Bonus: <span className="text-green-400">৳{promotion.maxBonus}</span>
+                              </p>
+                            )}
+                            {paymentMethod && (
+                              <p className="text-gray-300 flex items-center gap-1">
+                                <CreditCard className="w-3 h-3 text-blue-400" />
+                                For: <span className="text-blue-400">{paymentMethod.name}</span>
+                              </p>
+                            )}
+                          </div>
+
+                          {(promotion.startDate || promotion.endDate) && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                              <Calendar className="w-3 h-3" />
+                              {promotion.startDate && <span>{new Date(promotion.startDate).toLocaleDateString()}</span>}
+                              {promotion.startDate && promotion.endDate && <span>-</span>}
+                              {promotion.endDate && <span>{new Date(promotion.endDate).toLocaleDateString()}</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => handleTogglePromotionActive(promotion)}
+                            className={`p-2 rounded-lg ${promotion.isActive ? 'bg-green-600' : 'bg-gray-600'
+                              }`}
+                          >
+                            <Power className="w-4 h-4 text-white" />
+                          </button>
+                          <button
+                            onClick={() => openEditPromotion(promotion)}
+                            className="p-2 bg-blue-600 rounded-lg"
+                          >
+                            <Edit className="w-4 h-4 text-white" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePromotion(promotion._id)}
+                            className="p-2 bg-red-600 rounded-lg"
+                          >
+                            <Trash2 className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {promotions.length === 0 && (
+                  <div className="col-span-2 text-center py-8 bg-gray-750 rounded-lg border border-dashed border-gray-600">
+                    <Gift className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">No promotions for {tabLabels[activeTab]}</p>
+                    <p className="text-xs text-gray-500 mt-1">Create payment methods first, then add promotions</p>
+                    <button
+                      onClick={() => {
+                        setEditingItem(null);
+                        resetPromotionForm();
+                        setShowPromotionModal(true);
+                      }}
+                      className="mt-3 text-pink-400 hover:text-pink-300 text-sm"
+                    >
+                      + Add your first bonus
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1265,95 +1491,101 @@ export default function DepositManagement() {
             </div>
 
             <div className="space-y-3">
-              {formFields.sort((a, b) => a.order - b.order).map((field) => (
-                <div
-                  key={field._id}
-                  className="bg-gray-700 rounded-lg p-4 border border-gray-600"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-white font-semibold">{field.label}</h3>
-                        <span className="text-xs bg-gray-600 px-2 py-1 rounded text-gray-300">
-                          {field.type}
-                        </span>
-                        {field.required && (
-                          <span className="text-xs bg-red-600 px-2 py-1 rounded text-white">
-                            Required
-                          </span>
-                        )}
-                        {field.isBonusField && (
-                          <span className="text-xs bg-yellow-600 px-2 py-1 rounded text-white flex items-center gap-1">
-                            <Star className="w-3 h-3" />
-                            Bonus
-                          </span>
-                        )}
-                        {field.type === 'static' && field.isCopyable && (
-                          <span className="text-xs bg-blue-600 px-2 py-1 rounded text-white flex items-center gap-1">
-                            <Copy className="w-3 h-3" />
-                            Copyable
-                          </span>
-                        )}
-                      </div>
-                      
-                      <p className="text-sm text-gray-400 mt-1">Name: {field.name}</p>
-                      
-                      {field.placeholder && (
-                        <p className="text-sm text-gray-400">Placeholder: {field.placeholder}</p>
-                      )}
-                      
-                      {field.paymentMethodId && (
-                        <p className="text-xs text-blue-400 mt-1">
-                          Linked to Payment Method: {field.paymentMethodId}
-                        </p>
-                      )}
+              {formFields.sort((a, b) => a.order - b.order).map((field) => {
+                const linkedMethod = field.paymentMethodId
+                  ? paymentMethods.find(m => m._id === field.paymentMethodId)
+                  : null;
 
-                      {/* Static value display */}
-                      {field.type === 'static' && field.staticValue && (
-                        <div className="mt-2 p-2 bg-blue-600/10 rounded-lg border border-blue-600/20">
-                          <p className="text-xs text-blue-400 mb-1">Static Value:</p>
-                          <div className="flex items-center justify-between">
-                            <code className="text-sm text-white font-mono bg-gray-900 px-2 py-1 rounded">
-                              {field.staticValue}
-                            </code>
-                            {field.isCopyable && (
-                              <span className="text-xs text-green-400 flex items-center gap-1">
-                                <Copy className="w-3 h-3" />
-                                Copyable
-                              </span>
-                            )}
-                          </div>
+                return (
+                  <div
+                    key={field._id}
+                    className="bg-gray-700 rounded-lg p-4 border border-gray-600"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h3 className="text-white font-semibold">{field.label}</h3>
+                          <span className="text-xs bg-gray-600 px-2 py-1 rounded text-gray-300">
+                            {field.type}
+                          </span>
+                          {field.required && (
+                            <span className="text-xs bg-red-600 px-2 py-1 rounded text-white">
+                              Required
+                            </span>
+                          )}
+                          {field.isBonusField && (
+                            <span className="text-xs bg-yellow-600 px-2 py-1 rounded text-white flex items-center gap-1">
+                              <Star className="w-3 h-3" />
+                              Bonus
+                            </span>
+                          )}
+                          {field.type === 'static' && field.isCopyable && (
+                            <span className="text-xs bg-blue-600 px-2 py-1 rounded text-white flex items-center gap-1">
+                              <Copy className="w-3 h-3" />
+                              Copyable
+                            </span>
+                          )}
                         </div>
-                      )}
 
-                      <p className="text-xs text-gray-500 mt-2">Order: {field.order}</p>
-                    </div>
-                    
-                    <div className="flex gap-2 ml-4">
-                      <button
-                        onClick={() => handleToggleFieldActive(field)}
-                        className={`p-2 rounded-lg ${
-                          field.isActive ? 'bg-green-600' : 'bg-gray-600'
-                        }`}
-                      >
-                        <Power className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={() => openEditField(field)}
-                        className="p-2 bg-blue-600 rounded-lg"
-                      >
-                        <Edit className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteField(field._id)}
-                        className="p-2 bg-red-600 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4 text-white" />
-                      </button>
+                        <p className="text-sm text-gray-400 mt-1">Name: {field.name}</p>
+
+                        {field.placeholder && (
+                          <p className="text-sm text-gray-400">Placeholder: {field.placeholder}</p>
+                        )}
+
+                        {linkedMethod && (
+                          <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                            <CreditCard className="w-3 h-3" />
+                            Linked to: {linkedMethod.name}
+                          </p>
+                        )}
+
+                        {/* Static value display */}
+                        {field.type === 'static' && field.staticValue && (
+                          <div className="mt-2 p-2 bg-blue-600/10 rounded-lg border border-blue-600/20">
+                            <p className="text-xs text-blue-400 mb-1">Static Value:</p>
+                            <div className="flex items-center justify-between">
+                              <code className="text-sm text-white font-mono bg-gray-900 px-2 py-1 rounded">
+                                {field.staticValue}
+                              </code>
+                              {field.isCopyable && (
+                                <span className="text-xs text-green-400 flex items-center gap-1">
+                                  <Copy className="w-3 h-3" />
+                                  Copyable
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-gray-500 mt-2">Order: {field.order}</p>
+                      </div>
+
+                      <div className="flex gap-2 ml-4">
+                        <button
+                          onClick={() => handleToggleFieldActive(field)}
+                          className={`p-2 rounded-lg ${field.isActive ? 'bg-green-600' : 'bg-gray-600'
+                            }`}
+                        >
+                          <Power className="w-4 h-4 text-white" />
+                        </button>
+                        <button
+                          onClick={() => openEditField(field)}
+                          className="p-2 bg-blue-600 rounded-lg"
+                        >
+                          <Edit className="w-4 h-4 text-white" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteField(field._id)}
+                          className="p-2 bg-red-600 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {formFields.length === 0 && (
                 <p className="text-gray-400 text-center py-4">
                   No form fields for {tabLabels[activeTab]}
@@ -1412,7 +1644,7 @@ export default function DepositManagement() {
                   type="text"
                   value={methodForm.slug}
                   onChange={(e) => setMethodForm({
-                    ...methodForm, 
+                    ...methodForm,
                     slug: generateSlug(e.target.value)
                   })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
@@ -1445,13 +1677,12 @@ export default function DepositManagement() {
                     />
                     <label
                       htmlFor="method-icon-upload"
-                      className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${
-                        methodIconUploadStatus === 'success' 
-                          ? 'border-green-500 bg-green-500/10' 
-                          : methodIconUploadStatus === 'error'
+                      className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${methodIconUploadStatus === 'success'
+                        ? 'border-green-500 bg-green-500/10'
+                        : methodIconUploadStatus === 'error'
                           ? 'border-red-500 bg-red-500/10'
                           : 'border-gray-600 hover:border-blue-500 bg-gray-700/50'
-                      }`}
+                        }`}
                     >
                       <div className="text-center">
                         {uploadingMethodIcon ? (
@@ -1483,16 +1714,16 @@ export default function DepositManagement() {
                   {/* Preview or URL Input */}
                   {methodForm.icon && (
                     <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
-                      <img 
-                        src={methodForm.icon} 
-                        alt="Icon preview" 
+                      <img
+                        src={methodForm.icon}
+                        alt="Icon preview"
                         className="w-12 h-12 rounded-lg object-cover"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-400 truncate">{methodForm.icon}</p>
                         <button
                           type="button"
-                          onClick={() => setMethodForm({...methodForm, icon: ''})}
+                          onClick={() => setMethodForm({ ...methodForm, icon: '' })}
                           className="text-xs text-red-400 hover:text-red-300 mt-1"
                         >
                           Remove
@@ -1510,7 +1741,7 @@ export default function DepositManagement() {
                     <input
                       type="url"
                       value={methodForm.icon}
-                      onChange={(e) => setMethodForm({...methodForm, icon: e.target.value})}
+                      onChange={(e) => setMethodForm({ ...methodForm, icon: e.target.value })}
                       className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                       placeholder="https://example.com/icon.png"
                     />
@@ -1523,7 +1754,7 @@ export default function DepositManagement() {
                 <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
                 <textarea
                   value={methodForm.description}
-                  onChange={(e) => setMethodForm({...methodForm, description: e.target.value})}
+                  onChange={(e) => setMethodForm({ ...methodForm, description: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   placeholder="Optional description"
@@ -1536,7 +1767,7 @@ export default function DepositManagement() {
                 <input
                   type="number"
                   value={methodForm.order}
-                  onChange={(e) => setMethodForm({...methodForm, order: parseInt(e.target.value) || 0})}
+                  onChange={(e) => setMethodForm({ ...methodForm, order: parseInt(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   min="0"
                 />
@@ -1548,7 +1779,7 @@ export default function DepositManagement() {
                   type="checkbox"
                   id="methodActive"
                   checked={methodForm.isActive}
-                  onChange={(e) => setMethodForm({...methodForm, isActive: e.target.checked})}
+                  onChange={(e) => setMethodForm({ ...methodForm, isActive: e.target.checked })}
                   className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                 />
                 <label htmlFor="methodActive" className="ml-2 text-sm text-gray-300">
@@ -1589,6 +1820,7 @@ export default function DepositManagement() {
       )}
 
       {/* Instruction Modal */}
+      {/* Instruction Modal */}
       {showInstructionModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -1610,7 +1842,7 @@ export default function DepositManagement() {
                 <input
                   type="number"
                   value={instructionForm.step}
-                  onChange={(e) => setInstructionForm({...instructionForm, step: parseInt(e.target.value) || 1})}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, step: parseInt(e.target.value) || 1 })}
                   min="1"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   required
@@ -1621,11 +1853,44 @@ export default function DepositManagement() {
                 <label className="block text-sm font-medium text-gray-300 mb-1">Instruction Text *</label>
                 <textarea
                   value={instructionForm.text}
-                  onChange={(e) => setInstructionForm({...instructionForm, text: e.target.value})}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, text: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   required
                 />
+              </div>
+
+              {/* Payment Method Selection - NEW */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Link to Payment Method (Optional)
+                </label>
+                {paymentMethods.length > 0 ? (
+                  <select
+                    value={instructionForm.paymentMethodId || ''}
+                    onChange={(e) => setInstructionForm({
+                      ...instructionForm,
+                      paymentMethodId: e.target.value || undefined
+                    })}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                  >
+                    <option value="">All Payment Methods (Global)</option>
+                    {paymentMethods.map((method) => (
+                      <option key={method._id} value={method._id}>
+                        {method.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 bg-yellow-600/20 border border-yellow-600/30 rounded-lg">
+                    <p className="text-xs text-yellow-400">
+                      No payment methods available. Create a payment method first before linking.
+                    </p>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  If linked, this instruction will only show for this specific payment method
+                </p>
               </div>
 
               <div className="flex items-center">
@@ -1633,7 +1898,7 @@ export default function DepositManagement() {
                   type="checkbox"
                   id="instructionActive"
                   checked={instructionForm.isActive}
-                  onChange={(e) => setInstructionForm({...instructionForm, isActive: e.target.checked})}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, isActive: e.target.checked })}
                   className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                 />
                 <label htmlFor="instructionActive" className="ml-2 text-sm text-gray-300">
@@ -1660,8 +1925,7 @@ export default function DepositManagement() {
           </div>
         </div>
       )}
-
-      {/* Form Field Modal - Updated with Static Field Support */}
+      {/* Form Field Modal */}
       {showFieldModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
@@ -1688,7 +1952,7 @@ export default function DepositManagement() {
                   <input
                     type="text"
                     value={fieldForm.label}
-                    onChange={(e) => setFieldForm({...fieldForm, label: e.target.value})}
+                    onChange={(e) => setFieldForm({ ...fieldForm, label: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     placeholder="e.g., Agent Number"
                     required
@@ -1702,7 +1966,7 @@ export default function DepositManagement() {
                     value={fieldForm.name}
                     onChange={(e) => {
                       const newName = e.target.value || fieldForm.label.toLowerCase().replace(/\s+/g, '_');
-                      setFieldForm({...fieldForm, name: newName});
+                      setFieldForm({ ...fieldForm, name: newName });
                     }}
                     onBlur={(e) => {
                       if (!fieldForm.name && fieldForm.label) {
@@ -1710,7 +1974,7 @@ export default function DepositManagement() {
                           .toLowerCase()
                           .replace(/\s+/g, '_')
                           .replace(/[^a-z0-9_]/g, '');
-                        setFieldForm({...fieldForm, name: generatedName});
+                        setFieldForm({ ...fieldForm, name: generatedName });
                       }
                     }}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
@@ -1726,7 +1990,7 @@ export default function DepositManagement() {
                   <label className="block text-sm font-medium text-gray-300 mb-1">Field Type *</label>
                   <select
                     value={fieldForm.type}
-                    onChange={(e) => setFieldForm({...fieldForm, type: e.target.value as any})}
+                    onChange={(e) => setFieldForm({ ...fieldForm, type: e.target.value as any })}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     required
                   >
@@ -1749,7 +2013,7 @@ export default function DepositManagement() {
                         <input
                           type="text"
                           value={fieldForm.staticValue}
-                          onChange={(e) => setFieldForm({...fieldForm, staticValue: e.target.value})}
+                          onChange={(e) => setFieldForm({ ...fieldForm, staticValue: e.target.value })}
                           className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                           placeholder="e.g., 01712345678"
                           required
@@ -1765,7 +2029,7 @@ export default function DepositManagement() {
                         type="checkbox"
                         id="isCopyable"
                         checked={fieldForm.isCopyable}
-                        onChange={(e) => setFieldForm({...fieldForm, isCopyable: e.target.checked})}
+                        onChange={(e) => setFieldForm({ ...fieldForm, isCopyable: e.target.checked })}
                         className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                       />
                       <label htmlFor="isCopyable" className="ml-2 text-sm text-gray-300">
@@ -1782,7 +2046,7 @@ export default function DepositManagement() {
                     <input
                       type="text"
                       value={fieldForm.placeholder}
-                      onChange={(e) => setFieldForm({...fieldForm, placeholder: e.target.value})}
+                      onChange={(e) => setFieldForm({ ...fieldForm, placeholder: e.target.value })}
                       className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     />
                   </div>
@@ -1793,7 +2057,7 @@ export default function DepositManagement() {
                   <input
                     type="number"
                     value={fieldForm.order}
-                    onChange={(e) => setFieldForm({...fieldForm, order: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setFieldForm({ ...fieldForm, order: parseInt(e.target.value) || 0 })}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     min="0"
                   />
@@ -1810,7 +2074,7 @@ export default function DepositManagement() {
                     <select
                       value={fieldForm.paymentMethodId || ''}
                       onChange={(e) => setFieldForm({
-                        ...fieldForm, 
+                        ...fieldForm,
                         paymentMethodId: e.target.value || undefined
                       })}
                       className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
@@ -1833,7 +2097,7 @@ export default function DepositManagement() {
                     type="checkbox"
                     id="fieldRequired"
                     checked={fieldForm.required}
-                    onChange={(e) => setFieldForm({...fieldForm, required: e.target.checked})}
+                    onChange={(e) => setFieldForm({ ...fieldForm, required: e.target.checked })}
                     className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                   />
                   <label htmlFor="fieldRequired" className="ml-2 text-sm text-gray-300">
@@ -1846,7 +2110,7 @@ export default function DepositManagement() {
                     type="checkbox"
                     id="fieldActive"
                     checked={fieldForm.isActive}
-                    onChange={(e) => setFieldForm({...fieldForm, isActive: e.target.checked})}
+                    onChange={(e) => setFieldForm({ ...fieldForm, isActive: e.target.checked })}
                     className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                   />
                   <label htmlFor="fieldActive" className="ml-2 text-sm text-gray-300">
@@ -1866,7 +2130,7 @@ export default function DepositManagement() {
                           return;
                         }
                       }
-                      setFieldForm({...fieldForm, isBonusField: e.target.checked});
+                      setFieldForm({ ...fieldForm, isBonusField: e.target.checked });
                     }}
                     className="h-4 w-4 text-yellow-500 rounded bg-gray-700 border-gray-600"
                   />
@@ -1911,7 +2175,7 @@ export default function DepositManagement() {
         </div>
       )}
 
-      {/* Promotion Modal */}
+      {/* Promotion Modal - UPDATED with maxBonus and paymentMethodId */}
       {showPromotionModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] flex flex-col">
@@ -1925,6 +2189,9 @@ export default function DepositManagement() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Note: Create payment methods first before linking them to promotions
+              </p>
             </div>
 
             {/* Scrollable Content */}
@@ -1935,11 +2202,13 @@ export default function DepositManagement() {
               }} className="space-y-4">
                 {/* Bonus Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Bonus Name *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Bonus Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={promotionForm.bonusName}
-                    onChange={(e) => setPromotionForm({...promotionForm, bonusName: e.target.value})}
+                    onChange={(e) => setPromotionForm({ ...promotionForm, bonusName: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     placeholder="e.g., Eid Bonus, Welcome Bonus"
                     required
@@ -1948,21 +2217,22 @@ export default function DepositManagement() {
 
                 {/* Bonus Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Bonus Type *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Bonus Type <span className="text-red-500">*</span>
+                  </label>
                   <div className="grid grid-cols-2 gap-3">
                     <label
-                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        promotionForm.type === 'PERCENT'
-                          ? 'bg-blue-600/20 border-blue-500'
-                          : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
-                      }`}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'PERCENT'
+                        ? 'bg-blue-600/20 border-blue-500'
+                        : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
+                        }`}
                     >
                       <input
                         type="radio"
                         name="type"
                         value="PERCENT"
                         checked={promotionForm.type === 'PERCENT'}
-                        onChange={(e) => setPromotionForm({...promotionForm, type: e.target.value as 'PERCENT'})}
+                        onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value as 'PERCENT' })}
                         className="hidden"
                       />
                       <Percent className="w-4 h-4 text-blue-400" />
@@ -1970,18 +2240,17 @@ export default function DepositManagement() {
                     </label>
 
                     <label
-                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        promotionForm.type === 'FIXED'
-                          ? 'bg-blue-600/20 border-blue-500'
-                          : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
-                      }`}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'FIXED'
+                        ? 'bg-blue-600/20 border-blue-500'
+                        : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
+                        }`}
                     >
                       <input
                         type="radio"
                         name="type"
                         value="FIXED"
                         checked={promotionForm.type === 'FIXED'}
-                        onChange={(e) => setPromotionForm({...promotionForm, type: e.target.value as 'FIXED'})}
+                        onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value as 'FIXED' })}
                         className="hidden"
                       />
                       <DollarSign className="w-4 h-4 text-green-400" />
@@ -1993,7 +2262,8 @@ export default function DepositManagement() {
                 {/* Value */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    {promotionForm.type === 'PERCENT' ? 'Percentage Value *' : 'Fixed Amount (BDT) *'}
+                    {promotionForm.type === 'PERCENT' ? 'Percentage Value' : 'Fixed Amount (BDT)'}
+                    <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     {promotionForm.type === 'PERCENT' ? (
@@ -2004,10 +2274,10 @@ export default function DepositManagement() {
                     <input
                       type="number"
                       value={promotionForm.value}
-                      onChange={(e) => setPromotionForm({...promotionForm, value: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setPromotionForm({ ...promotionForm, value: parseFloat(e.target.value) || 0 })}
                       className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                       placeholder={promotionForm.type === 'PERCENT' ? "e.g., 10" : "e.g., 50"}
-                      min="0"
+                      min="0.1"
                       step={promotionForm.type === 'PERCENT' ? "0.1" : "1"}
                       required
                     />
@@ -2025,7 +2295,7 @@ export default function DepositManagement() {
                       type="number"
                       value={promotionForm.minDeposit || ''}
                       onChange={(e) => setPromotionForm({
-                        ...promotionForm, 
+                        ...promotionForm,
                         minDeposit: e.target.value ? parseFloat(e.target.value) : undefined
                       })}
                       className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
@@ -2033,6 +2303,63 @@ export default function DepositManagement() {
                       min="0"
                     />
                   </div>
+                </div>
+
+                {/* Max Bonus - NEW */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Maximum Bonus (Optional)
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      value={promotionForm.maxBonus || ''}
+                      onChange={(e) => setPromotionForm({
+                        ...promotionForm,
+                        maxBonus: e.target.value ? parseFloat(e.target.value) : undefined
+                      })}
+                      className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      placeholder="e.g., 200"
+                      min="0"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Maximum bonus amount (cap). Leave empty for no limit.
+                  </p>
+                </div>
+
+                {/* Payment Method Selection - NEW */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Link to Payment Method (Optional)
+                  </label>
+                  {paymentMethods.length > 0 ? (
+                    <select
+                      value={promotionForm.paymentMethodId || ''}
+                      onChange={(e) => setPromotionForm({
+                        ...promotionForm,
+                        paymentMethodId: e.target.value || undefined
+                      })}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    >
+                      <option value="">All Payment Methods (Global)</option>
+                      {paymentMethods.map((method) => (
+                        <option key={method._id} value={method._id}>
+                          {method.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="p-3 bg-yellow-600/20 border border-yellow-600/30 rounded-lg">
+                      <p className="text-xs text-yellow-400">
+                        No payment methods available. Create a payment method first before linking.
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    If linked, this bonus will only apply to this specific payment method
+                  </p>
                 </div>
 
                 {/* Icon Upload Section */}
@@ -2053,13 +2380,12 @@ export default function DepositManagement() {
                       />
                       <label
                         htmlFor="promotion-icon-upload"
-                        className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${
-                          promoIconUploadStatus === 'success' 
-                            ? 'border-green-500 bg-green-500/10' 
-                            : promoIconUploadStatus === 'error'
+                        className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${promoIconUploadStatus === 'success'
+                          ? 'border-green-500 bg-green-500/10'
+                          : promoIconUploadStatus === 'error'
                             ? 'border-red-500 bg-red-500/10'
                             : 'border-gray-600 hover:border-pink-500 bg-gray-700/50'
-                        }`}
+                          }`}
                       >
                         <div className="text-center">
                           {uploadingPromoIcon ? (
@@ -2091,16 +2417,16 @@ export default function DepositManagement() {
                     {/* Preview or URL Input */}
                     {promotionForm.iconUrl && (
                       <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
-                        <img 
-                          src={promotionForm.iconUrl} 
-                          alt="Icon preview" 
+                        <img
+                          src={promotionForm.iconUrl}
+                          alt="Icon preview"
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-400 truncate">{promotionForm.iconUrl}</p>
                           <button
                             type="button"
-                            onClick={() => setPromotionForm({...promotionForm, iconUrl: ''})}
+                            onClick={() => setPromotionForm({ ...promotionForm, iconUrl: '' })}
                             className="text-xs text-red-400 hover:text-red-300 mt-1"
                           >
                             Remove
@@ -2118,7 +2444,7 @@ export default function DepositManagement() {
                       <input
                         type="url"
                         value={promotionForm.iconUrl}
-                        onChange={(e) => setPromotionForm({...promotionForm, iconUrl: e.target.value})}
+                        onChange={(e) => setPromotionForm({ ...promotionForm, iconUrl: e.target.value })}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                         placeholder="https://example.com/icon.png"
                       />
@@ -2135,7 +2461,7 @@ export default function DepositManagement() {
                     <input
                       type="date"
                       value={promotionForm.startDate}
-                      onChange={(e) => setPromotionForm({...promotionForm, startDate: e.target.value})}
+                      onChange={(e) => setPromotionForm({ ...promotionForm, startDate: e.target.value })}
                       className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     />
                   </div>
@@ -2146,7 +2472,7 @@ export default function DepositManagement() {
                     <input
                       type="date"
                       value={promotionForm.endDate}
-                      onChange={(e) => setPromotionForm({...promotionForm, endDate: e.target.value})}
+                      onChange={(e) => setPromotionForm({ ...promotionForm, endDate: e.target.value })}
                       className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                     />
                   </div>
@@ -2158,7 +2484,7 @@ export default function DepositManagement() {
                     type="checkbox"
                     id="promotionActive"
                     checked={promotionForm.isActive}
-                    onChange={(e) => setPromotionForm({...promotionForm, isActive: e.target.checked})}
+                    onChange={(e) => setPromotionForm({ ...promotionForm, isActive: e.target.checked })}
                     className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                   />
                   <label htmlFor="promotionActive" className="ml-2 text-sm text-gray-300">
@@ -2225,7 +2551,7 @@ export default function DepositManagement() {
                 <input
                   type="text"
                   value={tittleForm.title}
-                  onChange={(e) => setTittleForm({...tittleForm, title: e.target.value})}
+                  onChange={(e) => setTittleForm({ ...tittleForm, title: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   placeholder="e.g., Deposit Methods"
                   required
@@ -2237,7 +2563,7 @@ export default function DepositManagement() {
                 <label className="block text-sm font-medium text-gray-300 mb-1">Description *</label>
                 <textarea
                   value={tittleForm.description}
-                  onChange={(e) => setTittleForm({...tittleForm, description: e.target.value})}
+                  onChange={(e) => setTittleForm({ ...tittleForm, description: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   placeholder="Enter a description for this page"
@@ -2254,7 +2580,7 @@ export default function DepositManagement() {
                   type="checkbox"
                   id="tittleActive"
                   checked={tittleForm.isActive}
-                  onChange={(e) => setTittleForm({...tittleForm, isActive: e.target.checked})}
+                  onChange={(e) => setTittleForm({ ...tittleForm, isActive: e.target.checked })}
                   className="h-4 w-4 text-blue-600 rounded bg-gray-700 border-gray-600"
                 />
                 <label htmlFor="tittleActive" className="ml-2 text-sm text-gray-300">

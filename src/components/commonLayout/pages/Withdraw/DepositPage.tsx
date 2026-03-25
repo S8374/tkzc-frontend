@@ -21,7 +21,8 @@ import {
   Star,
   Type,
   Info,
-  Check
+  Check,
+  CreditCard
 } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { depositService } from "@/services/api/deposit.service";
@@ -47,6 +48,7 @@ interface Instruction {
   step: number;
   text: string;
   tab: Tab;
+  paymentMethodId?: string;
   isActive: boolean;
 }
 
@@ -74,13 +76,23 @@ interface Tittle {
   isActive: boolean;
 }
 
+// Extended Promotion interface to include new fields
+interface ExtendedPromotion extends Promotion {
+  maxBonus?: number;
+  paymentMethodId?: {
+    _id: string;
+    name: string;
+    icon?: string;
+  } | string;
+}
+
 export default function DepositPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("manual");
   const [copied, setCopied] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
+  const [selectedPromotion, setSelectedPromotion] = useState<ExtendedPromotion | null>(null);
   const [showPromoDetails, setShowPromoDetails] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -88,9 +100,12 @@ export default function DepositPage() {
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>("");
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [minDepositAmount, setMinDepositAmount] = useState<number | null>(null);
+  const [maxBonusAmount, setMaxBonusAmount] = useState<number | null>(null);
   const [amountFieldName, setAmountFieldName] = useState<string>("");
   const [amountField, setAmountField] = useState<FormField | null>(null);
   const [bonusField, setBonusField] = useState<FormField | null>(null);
+  const [bonusFieldValue, setBonusFieldValue] = useState<string>("");
+  const [bonusFieldError, setBonusFieldError] = useState<string | null>(null);
   const [tittle, setTittle] = useState<Tittle | null>(null);
 
   // Form state - will store all form field values dynamically
@@ -101,19 +116,23 @@ export default function DepositPage() {
   // Data from API
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [instructions, setInstructions] = useState<Instruction[]>([]);
+  const [filteredInstructions, setFilteredInstructions] = useState<Instruction[]>([]);
   const [allFormFields, setAllFormFields] = useState<FormField[]>([]); // Store all fields
   const [filteredFormFields, setFilteredFormFields] = useState<FormField[]>([]); // Filtered by selection logic
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [promotions, setPromotions] = useState<ExtendedPromotion[]>([]);
   const [loading, setLoading] = useState(true);
 
   const walletAddress = "TEfuvvysBmXuUmBUxZGFM1J9a6LSVHGCP";
 
-  // Reset promotion selection when tab changes
+  // Reset when tab changes
   useEffect(() => {
     setSelectedPromotion(null);
     setCalculatedBonus(null);
     setMinDepositAmount(null);
+    setMaxBonusAmount(null);
     setAmountError(null);
+    setBonusFieldError(null);
+    setBonusFieldValue("");
     setSelectedMethod(null);
     setUploadStatus('idle');
     setUploadedFileUrl("");
@@ -123,7 +142,26 @@ export default function DepositPage() {
     setTittle(null);
     setFormData({});
     setFilteredFormFields([]);
+    setFilteredInstructions([]);
   }, [activeTab]);
+
+  // Filter instructions based on selected payment method
+  useEffect(() => {
+    if (instructions.length > 0) {
+      if (selectedMethod) {
+        // Show instructions that are either:
+        // 1. Linked to this payment method
+        // 2. Not linked to any payment method
+        const filtered = instructions.filter(instruction => 
+          !instruction.paymentMethodId || instruction.paymentMethodId === selectedMethod._id
+        );
+        setFilteredInstructions(filtered.sort((a, b) => a.step - b.step));
+      } else {
+        // Show all instructions when no method selected
+        setFilteredInstructions(instructions.sort((a, b) => a.step - b.step));
+      }
+    }
+  }, [selectedMethod, instructions]);
 
   // Filter form fields based on selected payment method
   useEffect(() => {
@@ -198,6 +236,10 @@ export default function DepositPage() {
       if (bonusField) {
         setBonusField(bonusField);
         console.log("Bonus field identified:", bonusField.name);
+        // Set initial bonus field value from formData if exists
+        if (formData[bonusField.name]) {
+          setBonusFieldValue(formData[bonusField.name]);
+        }
       }
     }
   }, [filteredFormFields]);
@@ -229,12 +271,32 @@ export default function DepositPage() {
     }
   }, [formData, amountFieldName, promotions, selectedPromotion]);
 
-  // Update minDeposit when promotion changes
+  // Validate bonus field value against max bonus
+  useEffect(() => {
+    if (bonusField && selectedPromotion?.maxBonus && bonusFieldValue) {
+      const bonusValue = parseFloat(bonusFieldValue);
+      if (!isNaN(bonusValue) && bonusValue > 0) {
+        if (bonusValue > selectedPromotion.maxBonus) {
+          setBonusFieldError(`Maximum bonus allowed is ৳${selectedPromotion.maxBonus}`);
+        } else {
+          setBonusFieldError(null);
+        }
+      } else {
+        setBonusFieldError(null);
+      }
+    } else {
+      setBonusFieldError(null);
+    }
+  }, [bonusFieldValue, selectedPromotion]);
+
+  // Update minDeposit and maxBonus when promotion changes
   useEffect(() => {
     if (selectedPromotion) {
       setMinDepositAmount(selectedPromotion.minDeposit || null);
+      setMaxBonusAmount(selectedPromotion.maxBonus || null);
     } else {
       setMinDepositAmount(null);
+      setMaxBonusAmount(null);
     }
   }, [selectedPromotion]);
 
@@ -314,13 +376,30 @@ export default function DepositPage() {
       bonus = selectedPromotion.value;
     }
 
+    // Apply max bonus cap if exists
+    if (selectedPromotion.maxBonus && bonus > selectedPromotion.maxBonus) {
+      bonus = selectedPromotion.maxBonus;
+    }
+
     setCalculatedBonus(bonus);
   };
 
-  const handleSelectPromotion = (promo: Promotion) => {
+  const handleSelectPromotion = (promo: ExtendedPromotion) => {
     if (promo.tab !== activeTab) {
       alert("This promotion is not available for the selected payment method");
       return;
+    }
+
+    // Check if promotion is linked to a specific payment method
+    if (promo.paymentMethodId && selectedMethod) {
+      const promoMethodId = typeof promo.paymentMethodId === 'object' 
+        ? promo.paymentMethodId._id 
+        : promo.paymentMethodId;
+      
+      if (promoMethodId !== selectedMethod._id) {
+        alert(`This promotion is only available for a different payment method`);
+        return;
+      }
     }
 
     setSelectedPromotion(promo);
@@ -329,6 +408,9 @@ export default function DepositPage() {
     if (promo.minDeposit) {
       alert(`Minimum deposit for ${promo.bonusName} is ৳${promo.minDeposit}`);
     }
+    if (promo.maxBonus) {
+      alert(`Maximum bonus for ${promo.bonusName} is ৳${promo.maxBonus}`);
+    }
   };
 
   const handleTabChange = (tab: Tab) => {
@@ -336,7 +418,10 @@ export default function DepositPage() {
     setSelectedPromotion(null);
     setCalculatedBonus(null);
     setMinDepositAmount(null);
+    setMaxBonusAmount(null);
     setAmountError(null);
+    setBonusFieldError(null);
+    setBonusFieldValue("");
     setAmountFieldName("");
     setAmountField(null);
     setBonusField(null);
@@ -361,6 +446,11 @@ export default function DepositPage() {
       console.log("Form data updated:", newData);
       return newData;
     });
+
+    // Track bonus field value separately for validation
+    if (bonusField && name === bonusField.name) {
+      setBonusFieldValue(value);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
@@ -406,6 +496,17 @@ export default function DepositPage() {
     if (selectedPromotion && selectedPromotion.minDeposit && amount < selectedPromotion.minDeposit) {
       alert(`Minimum deposit for ${selectedPromotion.bonusName} is ৳${selectedPromotion.minDeposit}`);
       return;
+    }
+
+    // Validate bonus field against max bonus
+    if (bonusField && selectedPromotion?.maxBonus && formData[bonusField.name]) {
+      const bonusValue = parseFloat(formData[bonusField.name]);
+      if (!isNaN(bonusValue) && bonusValue > 0) {
+        if (bonusValue > selectedPromotion.maxBonus) {
+          alert(`Maximum bonus allowed is ৳${selectedPromotion.maxBonus}. You entered ৳${bonusValue}`);
+          return;
+        }
+      }
     }
 
     if (!selectedMethod) {
@@ -508,7 +609,10 @@ export default function DepositPage() {
         setSelectedPromotion(null);
         setCalculatedBonus(null);
         setMinDepositAmount(null);
+        setMaxBonusAmount(null);
         setAmountError(null);
+        setBonusFieldError(null);
+        setBonusFieldValue("");
         setUploadStatus('idle');
         setUploadedFileUrl("");
 
@@ -523,7 +627,7 @@ export default function DepositPage() {
   };
 
   const getFieldIcon = (field: FormField) => {
-    if (field.isBonusField) return <Star className="w-4 h-4 text-yellow-500" />;
+    if (field.isBonusField) return '';
     if (field.type === 'number') return <Hash className="w-4 h-4 text-gray-400" />;
     if (field.type === 'textarea') return <FileText className="w-4 h-4 text-gray-400" />;
     if (field.type === 'static') return <FileText className="w-4 h-4 text-blue-400" />;
@@ -543,7 +647,7 @@ export default function DepositPage() {
     return <span className="text-xs font-bold text-black">{method.name.slice(0, 2).toUpperCase()}</span>;
   };
 
-  const formatBonus = (promotion: Promotion) => {
+  const formatBonus = (promotion: ExtendedPromotion) => {
     if (promotion.type === 'PERCENT') {
       return `${promotion.value}%`;
     } else {
@@ -566,9 +670,9 @@ export default function DepositPage() {
     return (
       <div className="min-h-screen bg-[#1E1D2A] text-white pb-10">
         <div className="relative h-16 flex items-center justify-between px-4 border-b border-gray-800">
-      <Suspense fallback={<div>Loading...</div>}>
-      <BackButton />
-    </Suspense>
+          <Suspense fallback={<div>Loading...</div>}>
+            <BackButton />
+          </Suspense>
           <h1 className="text-xl font-bold flex-1 text-center">Deposit</h1>
           <button className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center">
             <AlertCircle className="w-5 h-5" />
@@ -585,9 +689,9 @@ export default function DepositPage() {
     <div className="min-h-screen bg-[#1E1D2A] text-white pb-10">
       {/* Header */}
       <div className="relative h-16 flex items-center justify-between px-4 border-b border-gray-800">
-     <Suspense fallback={<div>Loading...</div>}>
-      <BackButton />
-    </Suspense>
+        <Suspense fallback={<div>Loading...</div>}>
+          <BackButton />
+        </Suspense>
         <h1 className="text-xl font-bold flex-1 text-center">Deposit</h1>
         <button
           onClick={() => router.push("/history")}
@@ -597,6 +701,23 @@ export default function DepositPage() {
           <ClipboardClock className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Page Title Section */}
+      {/* {tittle && tittle.isActive && (
+        <div className="px-4 mt-2 mb-4">
+          <div className="bg-gradient-to-r from-indigo-900/50 to-purple-900/50 rounded-2xl p-4 border border-indigo-500/30">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-600/20 flex items-center justify-center flex-shrink-0">
+                <Type className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white mb-1">{tittle.title}</h2>
+                <p className="text-gray-300 text-sm">{tittle.description}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )} */}
 
       {/* Tabs */}
       <div className="px-4 pt-5 pb-3">
@@ -634,7 +755,6 @@ export default function DepositPage() {
         </div>
       </div>
 
-
       {/* Selected Promotion Banner */}
       {selectedPromotion && (
         <div className="px-4 mt-2 mb-4">
@@ -648,6 +768,11 @@ export default function DepositPage() {
                     (Min: ৳{selectedPromotion.minDeposit})
                   </span>
                 )}
+                {selectedPromotion.maxBonus && (
+                  <span className="text-gray-300 ml-1">
+                    (Max: ৳{selectedPromotion.maxBonus}) 
+                  </span>
+                )}
               </span>
             </div>
             <button
@@ -655,7 +780,9 @@ export default function DepositPage() {
                 setSelectedPromotion(null);
                 setCalculatedBonus(null);
                 setMinDepositAmount(null);
+                setMaxBonusAmount(null);
                 setAmountError(null);
+                setBonusFieldError(null);
               }}
               className="text-gray-400 hover:text-white"
             >
@@ -678,53 +805,81 @@ export default function DepositPage() {
             </div>
             
             <div className="grid grid-cols-1 gap-3">
-              {promotions.filter(p => p.isActive).map((promo, index) => (
-                <div
-                  key={promo._id}
-                  onClick={() => handleSelectPromotion(promo)}
-                  className={`bg-gradient-to-r ${getPromoGradient(index)} p-[1px] rounded-xl cursor-pointer transform hover:scale-[1.02] transition-all duration-200`}
-                >
-                  <div className="bg-[#252334] rounded-xl p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${getPromoGradient(index)} flex items-center justify-center`}>
-                          {promo.type === 'PERCENT' ? (
-                            <Percent className="w-5 h-5 text-white" />
-                          ) : (
-                            <Wallet className="w-5 h-5 text-white" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-white">{promo.bonusName}</h3>
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="text-pink-400 font-bold">{formatBonus(promo)}</span>
-                            {promo.minDeposit && (
-                              <>
-                                <span className="text-gray-500">•</span>
-                                <span className="text-gray-300">Min: ৳{promo.minDeposit}</span>
-                              </>
+              {promotions.filter(p => p.isActive).map((promo, index) => {
+                // Get payment method name if linked
+                const promoMethod = typeof promo.paymentMethodId === 'object' 
+                  ? promo.paymentMethodId 
+                  : promo.paymentMethodId 
+                    ? paymentMethods.find(m => m._id === promo.paymentMethodId)
+                    : null;
+
+                return (
+                  <div
+                    key={promo._id}
+                    onClick={() => handleSelectPromotion(promo)}
+                    className={`bg-gradient-to-r ${getPromoGradient(index)} p-[1px]  rounded-xl cursor-pointer transform hover:scale-[1.02] transition-all duration-200 ${
+                      promo.paymentMethodId && selectedMethod && 
+                      ((typeof promo.paymentMethodId === 'object' 
+                        ? promo.paymentMethodId._id 
+                        : promo.paymentMethodId) !== selectedMethod._id)
+                        ? 'opacity-50 cursor-not-allowed'
+                        : ''
+                    }`}
+                  >
+                    <div className="bg-[#252334] rounded-xl p-3 ">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${getPromoGradient(index)} flex items-center justify-center`}>
+                            {promo.type === 'PERCENT' ? (
+                              <Percent className="w-5 h-5 text-white" />
+                            ) : (
+                              <Wallet className="w-5 h-5 text-white" />
+                            )}
+                          </div>
+                          <div className="">
+                            <h3 className="font-bold text-white">{promo.bonusName}</h3>
+                            <div className="flex items-center  gap-2 text-sm flex-wrap">
+                              <span className="text-pink-400 font-bold">{formatBonus(promo)}</span>
+                              {promo.minDeposit && (
+                                <>
+                                  <span className="text-gray-500">•</span>
+                                  <span className="text-gray-300">Min: ৳{promo.minDeposit}</span>
+                                </>
+                              )}
+                              {promo.maxBonus && (
+                                <>
+                                  <span className="text-gray-500">•</span>
+                                  <span className="text-gray-300">Max: ৳{promo.maxBonus}</span>
+                                </>
+                              )}
+                            </div>
+                            {promoMethod && (
+                              <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                                <CreditCard className="w-3 h-3" />
+                                For: {promoMethod.name}
+                              </p>
                             )}
                           </div>
                         </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
       {/* No Promotions Message */}
-      {promotions.filter(p => p.isActive).length === 0 && !selectedPromotion && (
+      {/* {promotions.filter(p => p.isActive).length === 0 && !selectedPromotion && (
         <div className="px-4 mt-2 mb-4">
           <div className="bg-gray-800/50 rounded-xl p-4 text-center">
             <p className="text-gray-400">No active bonuses available for this payment method</p>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Bonus Field Info */}
       {bonusField && (
@@ -764,18 +919,16 @@ export default function DepositPage() {
               </div>
             )}
 
-            {/* Instructions */}
-            {instructions.length > 0 && (
+            {/* Instructions - Filtered by payment method */}
+            {filteredInstructions.length > 0 && (
               <div className="bg-[#d5d7d7] rounded-xl p-4 border border-gray-700/50 mb-5">
                 <ul className="space-y-2 text-sm text-black">
-                  {instructions
-                    .sort((a, b) => a.step - b.step)
-                    .map((instruction) => (
-                      <li key={instruction._id} className="flex items-start gap-2">
-                        <span className="text-black font-bold">•</span>
-                        <span dangerouslySetInnerHTML={{ __html: instruction.text }} />
-                      </li>
-                    ))}
+                  {filteredInstructions.map((instruction) => (
+                    <li key={instruction._id} className="flex items-start gap-2">
+                      <span className="text-black font-bold">•</span>
+                      <span dangerouslySetInnerHTML={{ __html: instruction.text }} />
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
@@ -879,21 +1032,39 @@ export default function DepositPage() {
                             }
                             required={field.required}
                             min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
+                            max={field.isBonusField && maxBonusAmount ? maxBonusAmount : undefined}
                             className={`w-full bg-white border-0 rounded-xl pl-10 pr-4 py-3 text-black text-center text-lg placeholder-black focus:outline-none focus:ring-2 ${
-                              amountError && field.name === amountFieldName ? 'focus:ring-red-400 border-2 border-red-400' : 'focus:ring-green-400'
+                              (amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
+                                ? 'focus:ring-red-400 border-2 border-red-400' 
+                                : 'focus:ring-green-400'
                             }`}
                           />
                           {field.name === amountFieldName && calculatedBonus && (
-                            <div className="absolute -bottom-6 left-0 right-0 text-center">
-                              <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded-full">
+                            <div className="  left-0 right-0   text-center">
+                              <span className="text-xs text-green-400 bg-green-900/30 px-2  rounded-full">
                                 + ৳{calculatedBonus.toFixed(2)} bonus will be added
+                                {maxBonusAmount && ` (Max: ৳${maxBonusAmount})`}
                               </span>
                             </div>
                           )}
                           {field.name === amountFieldName && amountError && (
-                            <div className="absolute -bottom-6 left-0 right-0 text-center">
+                            <div className=" left-0 right-0 text-center mt-2">
                               <span className="text-xs text-red-400 bg-red-900/30 px-2 py-1 rounded-full">
                                 {amountError}
+                              </span>
+                            </div>
+                          )}
+                          {field.isBonusField && maxBonusAmount && (
+                            <div className="absolute -top-3 left-0  text-center">
+                              <span className="text-xs text-white  bg-yellow-600  px-2 py-1 rounded-full">
+                                Max: ৳{maxBonusAmount}
+                              </span>
+                            </div>
+                          )}
+                          {field.isBonusField && bonusFieldError && (
+                            <div className="  left-0 right-0 mb-0 text-center mt-2">
+                              <span className="text-xs text-red-400 bg-red-900/30 px-2 py-1 rounded-full">
+                                {bonusFieldError}
                               </span>
                             </div>
                           )}
@@ -919,7 +1090,7 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  disabled={submitting || (selectedPromotion && !!amountError) || filteredFormFields.length === 0}
+                  disabled={submitting || (selectedPromotion && !!amountError) || !!bonusFieldError || filteredFormFields.length === 0}
                   className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
                 >
                   {submitting ? 'Processing...' : 'Deposit Now'}
@@ -934,7 +1105,7 @@ export default function DepositPage() {
           </form>
         )}
 
-        {/* Auto Tab */}
+        {/* Auto Tab - Similar structure with max bonus validation */}
         {activeTab === "auto" && (
           <form onSubmit={handleSubmit} className="bg-[#252334] rounded-2xl p-5 border border-gray-800/50 text-center">
             <div className="mb-6">
@@ -975,18 +1146,16 @@ export default function DepositPage() {
               </p>
             </div>
 
-            {/* Instructions */}
-            {instructions.length > 0 && (
+            {/* Instructions - Filtered by payment method */}
+            {filteredInstructions.length > 0 && (
               <div className="bg-gray-900/60 rounded-xl p-4 border border-gray-700/50 mb-4 text-left">
                 <ul className="space-y-2 text-sm text-gray-200">
-                  {instructions
-                    .sort((a, b) => a.step - b.step)
-                    .map((instruction) => (
-                      <li key={instruction._id} className="flex items-start gap-2">
-                        <span className="text-green-400 font-bold mt-0.5">{instruction.step}.</span>
-                        <span>{instruction.text}</span>
-                      </li>
-                    ))}
+                  {filteredInstructions.map((instruction) => (
+                    <li key={instruction._id} className="flex items-start gap-2">
+                      <span className="text-green-400 font-bold mt-0.5">{instruction.step}.</span>
+                      <span>{instruction.text}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
@@ -1051,8 +1220,11 @@ export default function DepositPage() {
                             }
                             required={field.required}
                             min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
+                            max={field.isBonusField && maxBonusAmount ? maxBonusAmount : undefined}
                             className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-4 text-black text-center text-xl placeholder-black border-2 ${
-                              amountError && field.name === amountFieldName ? 'border-red-400' : 'border-[#d12d4d]'
+                              (amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
+                                ? 'border-red-400' 
+                                : 'border-[#d12d4d]'
                             } focus:outline-none focus:ring-2 focus:ring-red-400`}
                           />
                           {field.name === amountFieldName && calculatedBonus && (
@@ -1063,6 +1235,16 @@ export default function DepositPage() {
                           {field.name === amountFieldName && amountError && (
                             <div className="absolute -bottom-5 left-0 right-0 text-center">
                               <span className="text-xs text-red-400">{amountError}</span>
+                            </div>
+                          )}
+                          {field.isBonusField && maxBonusAmount && (
+                            <div className="absolute -bottom-5 left-0 right-0 text-center">
+                              <span className="text-xs text-blue-400">Max: ৳{maxBonusAmount}</span>
+                            </div>
+                          )}
+                          {field.isBonusField && bonusFieldError && (
+                            <div className="absolute -bottom-5 left-0 right-0 text-center">
+                              <span className="text-xs text-red-400">{bonusFieldError}</span>
                             </div>
                           )}
                           {field.isBonusField && (
@@ -1086,7 +1268,7 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  disabled={submitting || (selectedPromotion && !!amountError) || filteredFormFields.length === 0}
+                  disabled={submitting || (selectedPromotion && !!amountError) || !!bonusFieldError || filteredFormFields.length === 0}
                   className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
                 >
                   {submitting ? 'Processing...' : 'Deposit Now'}
@@ -1105,7 +1287,7 @@ export default function DepositPage() {
           </form>
         )}
 
-        {/* Crypto Tab */}
+        {/* Crypto Tab - Similar structure with max bonus validation */}
         {activeTab === "crypto" && (
           <form onSubmit={handleSubmit} className="bg-[#252334] rounded-2xl p-5 border border-gray-800/50">
             {/* Network Selection */}
@@ -1136,24 +1318,22 @@ export default function DepositPage() {
               ))}
             </div>
 
-            {/* Instructions */}
-            {instructions.length > 0 && (
+            {/* Instructions - Filtered by payment method */}
+            {filteredInstructions.length > 0 && (
               <div className="bg-[#e6e5e5] rounded-xl p-4 mb-5">
                 <ul className="space-y-2 text-sm text-black">
-                  {instructions
-                    .sort((a, b) => a.step - b.step)
-                    .map((instruction) => (
-                      <li key={instruction._id} className="flex items-start gap-2">
-                        <span className="text-black font-extrabold">•</span>
-                        <span>{instruction.text}</span>
-                      </li>
-                    ))}
+                  {filteredInstructions.map((instruction) => (
+                    <li key={instruction._id} className="flex items-start gap-2">
+                      <span className="text-black font-extrabold">•</span>
+                      <span>{instruction.text}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
 
             {/* Wallet Address */}
-            <div className="text-center mb-5">
+            {/* <div className="text-center mb-5">
               <div className="text-white text-sm mb-2">Wallet ID OR Address</div>
               <div className="flex items-center gap-2 bg-[#535352] rounded-lg p-3 border border-[#900c0c]">
                 <div className="font-mono text-xs flex-1 break-all text-left">
@@ -1167,7 +1347,7 @@ export default function DepositPage() {
                   <Copy className="w-3 h-3" /> {copied ? "Copied" : "copy"}
                 </button>
               </div>
-            </div>
+            </div> */}
 
             {/* Dynamic Form Fields */}
             <div className="space-y-4 mt-5">
@@ -1309,8 +1489,11 @@ export default function DepositPage() {
                           }
                           required={field.required}
                           min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
+                          max={field.isBonusField && maxBonusAmount ? maxBonusAmount : undefined}
                           className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-3 text-black border-2 ${
-                            amountError && field.name === amountFieldName ? 'border-red-400' : 'border-[#fc0613]'
+                            (amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
+                              ? 'border-red-400' 
+                              : 'border-[#fc0613]'
                           } text-center placeholder-black focus:outline-none focus:ring-2 focus:ring-red-400`}
                         />
                         {field.name === amountFieldName && calculatedBonus && (
@@ -1321,6 +1504,16 @@ export default function DepositPage() {
                         {field.name === amountFieldName && amountError && (
                           <div className="absolute -bottom-5 left-0 right-0 text-center">
                             <span className="text-xs text-red-400">{amountError}</span>
+                          </div>
+                        )}
+                        {field.isBonusField && maxBonusAmount && (
+                          <div className="absolute -bottom-5 left-0 right-0 text-center">
+                            <span className="text-xs text-blue-400">Max: ৳{maxBonusAmount}</span>
+                          </div>
+                        )}
+                        {field.isBonusField && bonusFieldError && (
+                          <div className="absolute -bottom-5 left-0 right-0 text-center">
+                            <span className="text-xs text-red-400">{bonusFieldError}</span>
                           </div>
                         )}
                         {field.isBonusField && (
@@ -1343,7 +1536,7 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  disabled={submitting || (selectedPromotion && !!amountError) || filteredFormFields.length === 0}
+                  disabled={submitting || (selectedPromotion && !!amountError) || !!bonusFieldError || filteredFormFields.length === 0}
                   className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
                 >
                   {submitting ? 'Processing...' : 'Deposit Now'}
@@ -1365,7 +1558,7 @@ export default function DepositPage() {
 
       {/* Success Modal */}
       {showSuccessModal && submittedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-[#252334] rounded-2xl max-w-sm w-full p-5 border border-gray-700">
             <div className="text-center mb-4">
               <div className="w-20 h-20 mx-auto bg-green-600 rounded-full flex items-center justify-center mb-3">

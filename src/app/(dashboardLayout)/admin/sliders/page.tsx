@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { sliderService } from "@/services/api/slider.service";
-import { sliderTypeService } from "@/services/api/slider.types";
+import { SliderData, sliderService } from "@/services/api/slider.service";
+import { SliderType, sliderTypeService } from "@/services/api/slider.types";
 import { uploadImageToImageBB } from "@/lib/imageUpload";
+import { oracleService } from "@/services/api/oracel.service";
 import {
     ArrowLeft,
     Link2,
@@ -24,24 +25,47 @@ import {
     Save,
     RefreshCw,
     Layers,
-    Hash,
     ExternalLink,
     MessageSquare,
     Heading1,
     Heading2,
-    Move,
+    Move,                           
     BluetoothConnectedIcon
 } from "lucide-react";
 
+type OracleGame = {
+    _id: string;
+    game_code: string;
+    gameName: string;
+    game_type: string;
+    image?: string;
+    provider_code: string;
+    rtp?: number;
+    jackpot?: string;
+};
+
+type OracleProviderDetailsResponse = {
+    success: boolean;
+    provider: {
+        providerCode: string;
+        providerName: string;
+        gameType: string;
+    };
+    gameCount: number;
+    games: OracleGame[];
+};
+
 const CreateSliderPage = () => {
     const router = useRouter();
-    const [sliderTypes, setSliderTypes] = useState<any[]>([]);
+    const [sliderTypes, setSliderTypes] = useState<SliderType[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchingTypes, setFetchingTypes] = useState(true);
+    const [fetchingProviderDetails, setFetchingProviderDetails] = useState(false);
     const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
     const [imagePreview, setImagePreview] = useState("");
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [games, setGames] = useState<OracleGame[]>([]);
 
     const [formData, setFormData] = useState({
         title: "",
@@ -52,15 +76,29 @@ const CreateSliderPage = () => {
         buttonText: "",
         buttonLink: "",
         imageRedirectLink: "",
+        money: 50,
+        username: "",
+        provider_code: "",
+        game_code: "",
+        game_type: "",
         order: 0,
         isActive: true
     });
+
+    const selectedSliderType = sliderTypes.find((type) => type._id === formData.sliderTypeId);
+    const availableProviderCodes = (selectedSliderType?.providerCode || "")
+        .split(",")
+        .map((code) => code.trim())
+        .filter(Boolean);
+
+    const selectedGame = games.find((game) => game.game_code === formData.game_code);
 
     // Fetch slider types
     useEffect(() => {
         const fetchTypes = async () => {
             try {
                 const res = await sliderTypeService.getAllSliderTypes();
+                console.log("Fetched slider types:", res.data);
                 setSliderTypes(res.data || []);
             } catch (error) {
                 toast.error("Failed to fetch slider types");
@@ -71,6 +109,35 @@ const CreateSliderPage = () => {
         fetchTypes();
     }, []);
 
+    useEffect(() => {
+        setFormData((prev) => ({
+            ...prev,
+            provider_code: "",
+            game_code: "",
+            game_type: ""
+        }));
+        setGames([]);
+    }, [formData.sliderTypeId]);
+
+    const fetchProviderGames = async (providerCode: string) => {
+        if (!providerCode) {
+            setGames([]);
+            setFormData((prev) => ({ ...prev, game_code: "", game_type: "" }));
+            return;
+        }
+
+        try {
+            setFetchingProviderDetails(true);
+            const providerDetails = await oracleService.getProviderDetails(providerCode) as OracleProviderDetailsResponse;
+            setGames(providerDetails?.games || []);
+        } catch (error) {
+            setGames([]);
+            toast.error("Failed to fetch provider games");
+        } finally {
+            setFetchingProviderDetails(false);
+        }
+    };
+
     const validateField = (name: string, value: any) => {
         switch (name) {
             case 'title':
@@ -79,6 +146,10 @@ const CreateSliderPage = () => {
                 return !value ? 'Image is required' : '';
             case 'sliderTypeId':
                 return !value ? 'Please select a slider type' : '';
+            case 'provider_code':
+                return availableProviderCodes.length > 0 && !value ? 'Please select a provider' : '';
+            case 'game_code':
+                return games.length > 0 && !value ? 'Please select a game' : '';
             case 'imageRedirectLink':
                 return !value ? 'Image redirect link is required' : '';
             case 'buttonLink':
@@ -103,6 +174,33 @@ const CreateSliderPage = () => {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         const parsedValue = type === "number" ? parseInt(value) || 0 : value;
+
+        if (name === "provider_code") {
+            setFormData((prev) => ({
+                ...prev,
+                provider_code: value,
+                game_code: "",
+                game_type: ""
+            }));
+            fetchProviderGames(value);
+            setErrors((prev) => ({
+                ...prev,
+                provider_code: validateField("provider_code", value),
+                game_code: ""
+            }));
+            return;
+        }
+
+        if (name === "game_code") {
+            const selected = games.find((game) => game.game_code === value);
+            setFormData((prev) => ({
+                ...prev,
+                game_code: value,
+                game_type: selected?.game_type || ""
+            }));
+            setErrors((prev) => ({ ...prev, game_code: validateField("game_code", value) }));
+            return;
+        }
         
         setFormData(prev => ({
             ...prev,
@@ -165,6 +263,12 @@ const CreateSliderPage = () => {
         if (!formData.image) newErrors.image = 'Image is required';
         if (!formData.sliderTypeId) newErrors.sliderTypeId = 'Please select a slider type';
         if (!formData.imageRedirectLink) newErrors.imageRedirectLink = 'Image redirect link is required';
+        if (availableProviderCodes.length > 0 && !formData.provider_code) {
+            newErrors.provider_code = 'Please select a provider';
+        }
+        if (games.length > 0 && !formData.game_code) {
+            newErrors.game_code = 'Please select a game';
+        }
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
@@ -172,7 +276,9 @@ const CreateSliderPage = () => {
                 title: true,
                 image: true,
                 sliderTypeId: true,
-                imageRedirectLink: true
+                imageRedirectLink: true,
+                provider_code: true,
+                game_code: true
             });
             toast.error('Please fill in all required fields');
             return;
@@ -180,8 +286,26 @@ const CreateSliderPage = () => {
 
         try {
             setLoading(true);
-            await sliderService.createSlider(formData);
+            const payload: SliderData = {
+                title: formData.title,
+                subtitle: formData.subtitle || undefined,
+                description: formData.description || undefined,
+                image: formData.image,
+                sliderTypeId: formData.sliderTypeId,
+                buttonText: formData.buttonText || undefined,
+                buttonLink: formData.buttonLink || undefined,
+                imageRedirectLink: formData.imageRedirectLink,
+                money: formData.money,
+                username: formData.username || undefined,
+                provider_code: formData.provider_code || undefined,
+                game_code: formData.game_code || undefined,
+                game_type: formData.game_type || undefined,
+                order: formData.order
+            };
+
+            await sliderService.createSlider(payload);
             toast.success("Slider created successfully!");
+            router.push('/admin/slider-controll');
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to create slider");
         } finally {
@@ -191,6 +315,7 @@ const CreateSliderPage = () => {
 
     const handleCancel = () => {
         if (confirm('Are you sure you want to cancel? All entered data will be lost.')) {
+            router.push('/admin/slider-controll');
         }
     };
 
@@ -490,6 +615,141 @@ const CreateSliderPage = () => {
                                     </p>
                                 )}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Game Launch Card */}
+                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                        <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
+                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Link2 className="w-5 h-5 text-yellow-500" />
+                                Game Launch Settings
+                            </h2>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-300">
+                                        Provider
+                                        {availableProviderCodes.length > 0 && <span className="text-red-500"> *</span>}
+                                    </label>
+                                    <select
+                                        name="provider_code"
+                                        value={formData.provider_code}
+                                        onChange={handleInputChange}
+                                        onBlur={() => handleBlur('provider_code')}
+                                        disabled={availableProviderCodes.length === 0}
+                                        className={`w-full appearance-none px-4 py-3 rounded-xl bg-gray-900/50 border ${
+                                            touched.provider_code && errors.provider_code
+                                                ? 'border-red-500/50 focus:border-red-500'
+                                                : 'border-gray-700 focus:border-yellow-500/50'
+                                        } text-white focus:outline-none transition-colors cursor-pointer disabled:opacity-50`}
+                                    >
+                                        <option value="" className="bg-gray-900">
+                                            {availableProviderCodes.length ? 'Select provider' : 'No provider in this slider type'}
+                                        </option>
+                                        {availableProviderCodes.map((providerCode) => (
+                                            <option key={providerCode} value={providerCode} className="bg-gray-900">
+                                                {providerCode}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {touched.provider_code && errors.provider_code && (
+                                        <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
+                                            <AlertCircle className="w-4 h-4" />
+                                            {errors.provider_code}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-300">
+                                        Game
+                                        {games.length > 0 && <span className="text-red-500"> *</span>}
+                                    </label>
+                                    <select
+                                        name="game_code"
+                                        value={formData.game_code}
+                                        onChange={handleInputChange}
+                                        onBlur={() => handleBlur('game_code')}
+                                        disabled={!formData.provider_code || fetchingProviderDetails || games.length === 0}
+                                        className={`w-full appearance-none px-4 py-3 rounded-xl bg-gray-900/50 border ${
+                                            touched.game_code && errors.game_code
+                                                ? 'border-red-500/50 focus:border-red-500'
+                                                : 'border-gray-700 focus:border-yellow-500/50'
+                                        } text-white focus:outline-none transition-colors cursor-pointer disabled:opacity-50`}
+                                    >
+                                        <option value="" className="bg-gray-900">
+                                            {fetchingProviderDetails
+                                                ? 'Loading games...'
+                                                : games.length
+                                                    ? 'Select game'
+                                                    : 'No games found'}
+                                        </option>
+                                        {games.map((game) => (
+                                            <option key={game._id} value={game.game_code} className="bg-gray-900">
+                                                {game.gameName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {touched.game_code && errors.game_code && (
+                                        <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
+                                            <AlertCircle className="w-4 h-4" />
+                                            {errors.game_code}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-300">Username</label>
+                                    <input
+                                        type="text"
+                                        name="username"
+                                        value={formData.username}
+                                        onChange={handleInputChange}
+                                        placeholder="Player username"
+                                        className="w-full px-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-300">Money</label>
+                                    <input
+                                        type="number"
+                                        name="money"
+                                        value={formData.money}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                        className="w-full px-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                    />
+                                </div>
+                            </div>
+
+                            {selectedGame && (
+                                <div className="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
+                                    <p className="text-sm text-gray-300 mb-3">Selected Game Details</p>
+                                    <div className="flex items-center gap-4">
+                                        {selectedGame.image ? (
+                                            <img
+                                                src={selectedGame.image}
+                                                alt={selectedGame.gameName}
+                                                className="w-20 h-20 rounded-lg object-cover border border-gray-700"
+                                            />
+                                        ) : (
+                                            <div className="w-20 h-20 rounded-lg border border-gray-700 bg-gray-800" />
+                                        )}
+                                        <div className="space-y-1 text-sm">
+                                            <p className="text-white font-medium">{selectedGame.gameName}</p>
+                                            <p className="text-gray-400">Code: {selectedGame.game_code}</p>
+                                            <p className="text-gray-400">Type: {selectedGame.game_type}</p>
+                                            <p className="text-gray-400">Provider: {selectedGame.provider_code}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
