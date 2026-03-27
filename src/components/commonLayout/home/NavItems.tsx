@@ -59,10 +59,7 @@ useEffect(() => {
   const checkAuth = async () => {
     try {
       const res = await authService.me(undefined);
-
-      if (res?.statusCode === 200) {
-        setIsLoggedIn(true);
-      }
+      setIsLoggedIn(!!(res?.success && res?.data));
     } catch {
       setIsLoggedIn(false);
     } finally {

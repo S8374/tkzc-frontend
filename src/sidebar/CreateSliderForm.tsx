@@ -105,7 +105,7 @@ export default function CreateSliderForm() {
 
   return (
     <div className="max-w-xl mx-auto mt-8 p-6 bg-gray-900 rounded-xl border border-gray-800 shadow-lg">
-      <h2 className="text-2xl font-bold text-white mb-6">Create Slider</h2>
+      <h2 className="text-2xl font-bold text-white mb-6">Create Slider And Game Library</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Title */}

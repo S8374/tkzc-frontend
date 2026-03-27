@@ -38,6 +38,8 @@ type OracleProviderResponse = {
 };
 
 const sliderTypeToGameTypeMap: Record<string, string[]> = {
+    home: [],
+    hero: [],
     hot: ["SLOT", "CASINO", "FISHING"],
     "recent-views": [],
     "slot-game": ["SLOT"],
@@ -63,7 +65,6 @@ const CreateSliderTypePage = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [providers, setProviders] = useState<OracleProvider[]>([]);
-    const [selectedProviderCodes, setSelectedProviderCodes] = useState<string[]>([]);
     
     useEffect(() => {
         const fetchProviders = async () => {
@@ -78,7 +79,8 @@ const CreateSliderTypePage = () => {
     }, []);
 
     const selectedSliderType = formData.name;
-    const shouldMatchProviders = selectedSliderType !== "home" && selectedSliderType !== "hero";
+    const imageOnlyTypes = new Set(["home", "hero", "promotion"]);
+    const shouldMatchProviders = !imageOnlyTypes.has(selectedSliderType);
 
     const matchedProviders = shouldMatchProviders
         ? providers.filter((provider) => {
@@ -100,28 +102,13 @@ const CreateSliderTypePage = () => {
         })()
         : [];
 
-    useEffect(() => {
-        setSelectedProviderCodes([]);
-    }, [selectedSliderType]);
-
-    const toggleProviderSelection = (providerCode: string) => {
-        setSelectedProviderCodes((prev) =>
-            prev.includes(providerCode)
-                ? prev.filter((code) => code !== providerCode)
-                : [...prev, providerCode]
-        );
-    };
-
-    const selectAllProviders = () => {
-        setSelectedProviderCodes(providerSelectionPool.map((provider) => provider.providerCode));
-    };
-
-    const clearSelectedProviders = () => {
-        setSelectedProviderCodes([]);
-    };
-    const sliderTypeOptions = [
+    const imageTypeOptions = [
         { id: "home", label: "Home", icon: "🏠" },
         { id: "hero", label: "Hero", icon: "⭐" },
+        { id: "promotion", label: "Promotion", icon: "🎁" },
+    ];
+
+    const gameTypeOptions = [
         { id: "hot", label: "Hot", icon: "🔥" },
         { id: "recent-views", label: "Recent Views", icon: "👁️" },
         { id: "slot-game", label: "Slot Game", icon: "🎰" },
@@ -130,7 +117,6 @@ const CreateSliderTypePage = () => {
         { id: "lottory", label: "Lottory", icon: "🎲" },
         { id: "sport", label: "Sport", icon: "⚽" },
         { id: "table-game", label: "Table Game", icon: "🎯" },
-        { id: "promotion", label: "Promotion", icon: "🎯" },
     ];
 
     const validateField = (name: string, value: string) => {
@@ -212,27 +198,23 @@ const CreateSliderTypePage = () => {
             return;
         }
 
-        if (shouldMatchProviders && providerSelectionPool.length > 0 && selectedProviderCodes.length === 0) {
-            toast.error('Please select at least one provider');
-            return;
-        }
-
         try {
             setLoading(true);
-            const selectedProviders = providerSelectionPool.filter((provider) =>
-                selectedProviderCodes.includes(provider.providerCode)
-            );
+            const selectedProviders = providerSelectionPool;
 
-            const uniqueGameTypes = Array.from(
-                new Set(
-                    selectedProviders.flatMap((provider) =>
-                        provider.gameType
-                            .split(",")
-                            .map((type) => type.trim().toUpperCase())
-                            .filter(Boolean)
+            const mappedGameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
+            const uniqueGameTypes = mappedGameTypes.length
+                ? mappedGameTypes
+                : Array.from(
+                    new Set(
+                        selectedProviders.flatMap((provider) =>
+                            provider.gameType
+                                .split(",")
+                                .map((type) => type.trim().toUpperCase())
+                                .filter(Boolean)
+                        )
                     )
-                )
-            );
+                );
 
             const payload: SliderTypeData = {
                 ...formData,
@@ -287,7 +269,7 @@ const CreateSliderTypePage = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-                                Create Slider Type
+                                Create Slider Type And Game Type
                             </h1>
                             <p className="text-gray-400 mt-1 flex items-center gap-2">
                                 <Type className="w-4 h-4" />
@@ -326,11 +308,20 @@ const CreateSliderTypePage = () => {
                                             } text-white focus:outline-none transition-colors cursor-pointer`}
                                     >
                                         <option value="" className="bg-gray-900">Select a slider type</option>
-                                        {sliderTypeOptions.map((type) => (
-                                            <option key={type.id} value={type.id} className="bg-gray-900">
-                                                {type.icon} {type.label}
-                                            </option>
-                                        ))}
+                                        <optgroup label="Image Types">
+                                            {imageTypeOptions.map((type) => (
+                                                <option key={type.id} value={type.id} className="bg-gray-900">
+                                                    {type.icon} {type.label}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                        <optgroup label="Game Types">
+                                            {gameTypeOptions.map((type) => (
+                                                <option key={type.id} value={type.id} className="bg-gray-900">
+                                                    {type.icon} {type.label}
+                                                </option>
+                                            ))}
+                                        </optgroup>
                                     </select>
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                                         <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,68 +338,6 @@ const CreateSliderTypePage = () => {
                                 <p className="text-xs text-gray-500 mt-1">
                                     Choose one predefined slider type for your sliders
                                 </p>
-
-                                {selectedSliderType && shouldMatchProviders && (
-                                    <div className="mt-3 rounded-xl border border-gray-700 bg-gray-900/40 p-4">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className="text-sm font-medium text-gray-200">Select Providers</p>
-                                            <span className="text-xs px-2 py-1 rounded-md bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
-                                                {selectedProviderCodes.length}/{providerSelectionPool.length}
-                                            </span>
-                                        </div>
-
-                                        <div className="mt-3 flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={selectAllProviders}
-                                                className="text-xs px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors"
-                                            >
-                                                Select All
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={clearSelectedProviders}
-                                                className="text-xs px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors"
-                                            >
-                                                Clear
-                                            </button>
-                                        </div>
-
-                                        {providerSelectionPool.length > 0 ? (
-                                            <div className="mt-3 flex flex-wrap gap-2 max-h-40 overflow-auto pr-1">
-                                                {providerSelectionPool.map((provider) => {
-                                                    const isSelected = selectedProviderCodes.includes(provider.providerCode);
-
-                                                    return (
-                                                    <button
-                                                        type="button"
-                                                        key={provider._id}
-                                                        onClick={() => toggleProviderSelection(provider.providerCode)}
-                                                        className={`text-xs px-2 py-1 rounded-md border transition-colors ${isSelected
-                                                            ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300'
-                                                            : 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700'
-                                                            }`}
-                                                    >
-                                                        {provider.providerName}
-                                                    </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <p className="mt-2 text-xs text-gray-400">
-                                                No providers available for this slider type.
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-
-                                {selectedSliderType && !shouldMatchProviders && (
-                                    <div className="mt-3 rounded-xl border border-gray-700 bg-gray-900/40 p-3">
-                                        <p className="text-xs text-gray-400">
-                                            Provider matching is not required for Home and Hero.
-                                        </p>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Description */}

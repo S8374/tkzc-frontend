@@ -11,6 +11,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import HomeTabContent from "./tabContent/HomeTabContent";
 import { sliderTypeService } from "@/services/api/slider.types";
 import { sliderService } from "@/services/api/slider.service";
+import { oracleService } from "@/services/api/oracel.service";
 import SearchField from "@/components/reUseAbleItems/SearchField";
 import ItemsCard from "@/components/reUseAbleItems/ItemsCard";
 
@@ -262,6 +263,7 @@ const DynamicTabContent = ({
 }) => {
   const { t } = useTranslation();
   const [sliders, setSliders] = useState<any[]>([]);
+  const [gameImageMap, setGameImageMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -286,6 +288,45 @@ const DynamicTabContent = ({
     fetchSliders();
   }, [sliderTypeId]);
 
+  useEffect(() => {
+    const preloadGameImages = async () => {
+      const providerCodes = Array.from(
+        new Set(
+          sliders
+            .filter((item) => !item.image && item.provider_code && item.game_code)
+            .map((item) => item.provider_code)
+        )
+      );
+
+      if (!providerCodes.length) {
+        setGameImageMap({});
+        return;
+      }
+
+      try {
+        const detailsList = await Promise.all(
+          providerCodes.map((providerCode) => oracleService.getProviderDetails(providerCode))
+        );
+
+        const map: Record<string, string> = {};
+        detailsList.forEach((details: any) => {
+          const games = details?.games || [];
+          games.forEach((game: any) => {
+            if (game?.provider_code && game?.game_code && game?.image) {
+              map[`${game.provider_code}:${game.game_code}`] = game.image;
+            }
+          });
+        });
+
+        setGameImageMap(map);
+      } catch {
+        setGameImageMap({});
+      }
+    };
+
+    preloadGameImages();
+  }, [sliders]);
+
   // 🔎 Search filter
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return sliders;
@@ -301,9 +342,12 @@ const DynamicTabContent = ({
   // 🔁 Convert API sliders → ItemsCard format
   const mappedItems = filteredItems.map((item) => ({
     id: item._id,
-    title: item.title,
+    title: item.title || item.game_code || "Game",
     subtitle: item.subtitle,
-    imageUrl: item.image,
+    imageUrl:
+      item.image ||
+      gameImageMap[`${item.provider_code}:${item.game_code}`] ||
+      "https://via.placeholder.com/300x200?text=No+Image",
     onClick: () => {
       if (item.imageRedirectLink) {
         window.open(item.imageRedirectLink, "_blank");

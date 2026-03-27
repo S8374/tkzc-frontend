@@ -10,8 +10,5 @@ export const oracleService = {
     const response = await oracleApi.get(`/providers/${code}`);
     return response.data;
   },
-  async createGame(data: any) {
-    const response = await oracleApi.post("/games", data);
-    return response.data;
-  }
+
 };

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { sliderTypeService } from "@/services/api/slider.types";
 import { sliderService } from "@/services/api/slider.service";
+import { oracleService } from "@/services/api/oracel.service";
 import toast from "react-hot-toast";
 import {
     LayoutGrid,
@@ -54,11 +55,14 @@ import {
 
 interface Slider {
     _id: string;
-    title: string;
+    title?: string;
     subtitle?: string;
-    image: string;
+    image?: string;
     buttonText?: string;
     buttonLink?: string;
+    provider_code?: string;
+    game_code?: string;
+    game_type?: string;
     order: number;
     isActive: boolean;
     createdAt?: string;
@@ -75,6 +79,7 @@ interface SliderType {
 
 const SliderManagementPage = () => {
     const [typesWithSliders, setTypesWithSliders] = useState<SliderType[]>([]);
+    const [gameImageMap, setGameImageMap] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set());
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -87,11 +92,13 @@ const SliderManagementPage = () => {
         try {
             setLoading(true);
             const res = await sliderTypeService.getSliderTypeWithSliders();
-            setTypesWithSliders(res.data || []);
+            const types = res.data || [];
+            setTypesWithSliders(types);
+            await preloadGameImages(types);
             
             // Auto-expand first type if exists
-            if (res.data?.length > 0) {
-                setExpandedTypes(new Set([res.data[0]._id]));
+            if (types.length > 0) {
+                setExpandedTypes(new Set([types[0]._id]));
             }
         } catch (error) {
             toast.error("Failed to fetch slider data");
@@ -103,6 +110,48 @@ const SliderManagementPage = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    const preloadGameImages = async (types: SliderType[]) => {
+        const sliders = types.flatMap((type) => type.sliders || []);
+        const providerCodes = Array.from(
+            new Set(
+                sliders
+                    .filter((slider) => !slider.image && slider.provider_code && slider.game_code)
+                    .map((slider) => slider.provider_code as string)
+            )
+        );
+
+        if (!providerCodes.length) {
+            setGameImageMap({});
+            return;
+        }
+
+        try {
+            const detailsList = await Promise.all(
+                providerCodes.map((providerCode) => oracleService.getProviderDetails(providerCode))
+            );
+
+            const nextMap: Record<string, string> = {};
+            detailsList.forEach((details: any) => {
+                const games = details?.games || [];
+                games.forEach((game: any) => {
+                    if (game?.provider_code && game?.game_code && game?.image) {
+                        nextMap[`${game.provider_code}:${game.game_code}`] = game.image;
+                    }
+                });
+            });
+
+            setGameImageMap(nextMap);
+        } catch {
+            setGameImageMap({});
+        }
+    };
+
+    const getSliderImage = (slider: Slider) => {
+        if (slider.image) return slider.image;
+        if (!slider.provider_code || !slider.game_code) return "https://via.placeholder.com/800x400?text=No+Image";
+        return gameImageMap[`${slider.provider_code}:${slider.game_code}`] || "https://via.placeholder.com/800x400?text=No+Image";
+    };
 
     const toggleType = (typeId: string) => {
         const newExpanded = new Set(expandedTypes);
@@ -172,7 +221,7 @@ const SliderManagementPage = () => {
             const { _id, ...sliderData } = slider;
             await sliderService.createSlider({
                 ...sliderData,
-                title: `${slider.title} (Copy)`,
+                title: `${slider.title || slider.game_code || "Untitled Slider"} (Copy)`,
                 sliderTypeId: "",
                 imageRedirectLink: ""
             });
@@ -235,7 +284,7 @@ const SliderManagementPage = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-4xl font-bold bg-linear-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-                            Slider Management
+                            Slider Management And Game Library
                         </h1>
                         <p className="text-gray-400 mt-2 flex items-center gap-2">
                             <Layers className="w-4 h-4" />
@@ -550,8 +599,8 @@ const SliderManagementPage = () => {
                                                     >
                                                         <div className="relative h-40">
                                                             <img
-                                                                src={slider.image}
-                                                                alt={slider.title}
+                                                                src={getSliderImage(slider)}
+                                                                alt={slider.title || slider.game_code || "Slider image"}
                                                                 className="w-full h-full object-cover"
                                                             />
                                                             <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
@@ -570,7 +619,7 @@ const SliderManagementPage = () => {
                                                         </div>
                                                         
                                                         <div className="p-4">
-                                                            <h4 className="font-semibold text-white mb-1">{slider.title}</h4>
+                                                            <h4 className="font-semibold text-white mb-1">{slider.title || slider.game_code || "Untitled Slider"}</h4>
                                                             {slider.subtitle && (
                                                                 <p className="text-sm text-gray-400 mb-2 line-clamp-2">{slider.subtitle}</p>
                                                             )}
@@ -592,7 +641,7 @@ const SliderManagementPage = () => {
                                                                 </button>
                                                                 
                                                                 <button
-                                                                    onClick={() => toggleSliderStatus(slider._id, slider.isActive, slider.title)}
+                                                                    onClick={() => toggleSliderStatus(slider._id, slider.isActive, slider.title || slider.game_code || "Untitled Slider")}
                                                                     className={`p-1.5 rounded-lg transition-all ${
                                                                         slider.isActive
                                                                             ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
@@ -612,7 +661,7 @@ const SliderManagementPage = () => {
                                                                 </Link>
 
                                                                 <button
-                                                                    onClick={() => handleDeleteSlider(slider._id, slider.title)}
+                                                                    onClick={() => handleDeleteSlider(slider._id, slider.title || slider.game_code || "Untitled Slider")}
                                                                     className="p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-500 rounded-lg transition-all"
                                                                     title="Delete"
                                                                 >
@@ -639,8 +688,8 @@ const SliderManagementPage = () => {
                                                         {/* Image */}
                                                         <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                                             <img
-                                                                src={slider.image}
-                                                                alt={slider.title}
+                                                                src={getSliderImage(slider)}
+                                                                alt={slider.title || slider.game_code || "Slider image"}
                                                                 className="w-full h-full object-cover group-hover/slider:scale-110 transition-transform duration-300"
                                                             />
                                                         </div>
@@ -648,7 +697,7 @@ const SliderManagementPage = () => {
                                                         {/* Content */}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-3">
-                                                                <h4 className="font-medium text-white truncate">{slider.title}</h4>
+                                                                <h4 className="font-medium text-white truncate">{slider.title || slider.game_code || "Untitled Slider"}</h4>
                                                                 
                                                             </div>
                                                             
@@ -675,7 +724,7 @@ const SliderManagementPage = () => {
                                                             </button>
 
                                                             <button
-                                                                onClick={() => toggleSliderStatus(slider._id, slider.isActive, slider.title)}
+                                                                onClick={() => toggleSliderStatus(slider._id, slider.isActive, slider.title || slider.game_code || "Untitled Slider")}
                                                                 className={`p-2 rounded-lg transition-all ${
                                                                     slider.isActive
                                                                         ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
@@ -695,7 +744,7 @@ const SliderManagementPage = () => {
                                                             </Link>
 
                                                             <button
-                                                                onClick={() => handleDeleteSlider(slider._id, slider.title)}
+                                                                onClick={() => handleDeleteSlider(slider._id, slider.title || slider.game_code || "Untitled Slider")}
                                                                 className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-red-500 rounded-lg transition-all"
                                                                 title="Delete"
                                                             >

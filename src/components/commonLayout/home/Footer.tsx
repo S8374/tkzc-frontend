@@ -28,9 +28,7 @@ const Footer = () => {
       try {
         const res = await authService.me(undefined);
         console.log("Auth check response:", res);
-        if (res?.statusCode === 200) {
-          setIsLoggedIn(true);
-        }
+        setIsLoggedIn(!!(res?.success && res?.data));
       } catch {
         setIsLoggedIn(false);
       }
@@ -105,8 +103,21 @@ const Footer = () => {
                     "/invite",
                   ];
 
-                  if (protectedRoutes.includes(item.href) && !isLoggedIn) {
-                    toast.error("Please login first");
+                  if (protectedRoutes.includes(item.href)) {
+                    authService.me(undefined)
+                      .then((res) => {
+                        if (res?.success && res?.data) {
+                          setIsLoggedIn(true);
+                          handleNavigation(item.href);
+                          return;
+                        }
+                        setIsLoggedIn(false);
+                        toast.error("Please login first");
+                      })
+                      .catch(() => {
+                        setIsLoggedIn(false);
+                        toast.error("Please login first");
+                      });
                     return;
                   }
 

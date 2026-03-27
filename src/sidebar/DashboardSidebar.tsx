@@ -3,10 +3,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { SIDEBAR_CONFIG, hasChildren } from "./sidebar.config";
 import { cn } from "@/lib/utils";
 import Logo from "@/shared/Logo/Logo";
+import { authService } from "@/services/api/auth.services";
+import toast from "react-hot-toast";
 import {
   Sheet,
   SheetContent,
@@ -34,10 +36,21 @@ interface SidebarProps {
 
 export default function DashboardSidebar({ role }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [isHovered, setIsHovered] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout(undefined);
+      toast.success("Logged out successfully");
+      router.replace("/");
+    } catch {
+      toast.error("Logout failed");
+    }
+  };
 
   // Detect mobile
   useEffect(() => {
@@ -214,6 +227,7 @@ export default function DashboardSidebar({ role }: SidebarProps) {
           <span className="truncate font-medium">Help & Support</span>
         </Link>
         <button
+          onClick={handleLogout}
           className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-white/10 transition-all duration-300"
         >
           <LogOut className="h-5 w-5" />
@@ -371,6 +385,7 @@ export default function DashboardSidebar({ role }: SidebarProps) {
                   </Link>
                 </SheetClose>
                 <button
+                  onClick={handleLogout}
                   className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-white/10 transition-all duration-300"
                 >
                   <LogOut className="h-5 w-5" />

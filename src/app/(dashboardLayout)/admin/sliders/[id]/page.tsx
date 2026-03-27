@@ -1,696 +1,745 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// app/(dashboard)/slider/edit/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { sliderService } from "@/services/api/slider.service";
-import { sliderTypeService } from "@/services/api/slider.types";
+import { ArrowLeft, Check, Loader2, Upload } from "lucide-react";
+import { sliderService, type SliderData } from "@/services/api/slider.service";
+import { sliderTypeService, type SliderType } from "@/services/api/slider.types";
+import { oracleService } from "@/services/api/oracel.service";
 import { uploadImageToImageBB } from "@/lib/imageUpload";
-import {
-    ArrowLeft,
-    Link2,
-    Upload,
-    Type,
-    FileText,
-    Image as ImageIcon,
-    Eye,
-    Check,
-    AlertCircle,
-    X,
-    Camera,
-    Globe,
-    Save,
-    RefreshCw,
-    Layers,
-    Hash,
-    ExternalLink,
-    MessageSquare,
-    Heading1,
-    Heading2,
-    Move,
-    Edit3,
-    BluetoothConnectedIcon
-} from "lucide-react";
+
+type SliderMode = "image" | "game" | "both";
+
+type Provider = {
+  code: string;
+  id?: string;
+  name: string;
+};
+
+type Game = {
+  game_code: string;
+  game_id?: string;
+  provider_code: string;
+  provider_id?: string;
+  game_type?: string;
+  name?: string;
+  image?: string;
+};
+
+type SliderResponse = {
+  _id: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  image?: string;
+  sliderTypeId?: string;
+  buttonText?: string;
+  buttonLink?: string;
+  imageRedirectLink?: string;
+  money?: number;
+  username?: string;
+  provider_code?: string;
+  provider_id?: string;
+  game_code?: string;
+  game_id?: string;
+  game_type?: string;
+  order?: number;
+  isActive?: boolean;
+};
+
+type FormDataState = {
+  title: string;
+  subtitle: string;
+  description: string;
+  image: string;
+  sliderTypeId: string;
+  buttonText: string;
+  buttonLink: string;
+  imageRedirectLink: string;
+  order: number;
+  isActive: boolean;
+  money: string;
+  username: string;
+};
+
+const initialFormData: FormDataState = {
+  title: "",
+  subtitle: "",
+  description: "",
+  image: "",
+  sliderTypeId: "",
+  buttonText: "",
+  buttonLink: "",
+  imageRedirectLink: "",
+  order: 0,
+  isActive: true,
+  money: "",
+  username: "",
+};
+
+const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x220?text=No+Image";
+const IMAGE_ONLY_SLIDER_TYPES = new Set(["home", "hero", "promotion"]);
+
+const SLIDER_TYPE_TO_GAME_TYPE_MAP: Record<string, string[]> = {
+  home: [],
+  hero: [],
+  hot: ["SLOT", "CASINO", "FISHING"],
+  "recent-views": [],
+  "slot-game": ["SLOT"],
+  live: ["CASINO"],
+  "fishing-game": ["FISHING"],
+  lottory: ["LOTTERY"],
+  sport: ["SPORTS"],
+  "table-game": ["CASINO"],
+  promotion: [],
+};
+
+const asArray = <T,>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  return [];
+};
+
+const toProviders = (raw: unknown): Provider[] => {
+  const list = asArray<Record<string, unknown>>(raw);
+  return list.reduce<Provider[]>((acc, item) => {
+      const code =
+        (item.code as string) ||
+        (item.provider_code as string) ||
+        (item.providerCode as string) ||
+        "";
+      const name =
+        (item.name as string) ||
+        (item.provider_name as string) ||
+        (item.providerName as string) ||
+        code;
+      const id = (item.id as string) || (item.provider_id as string) || (item.providerId as string);
+      if (!code) return acc;
+      acc.push({ code, name, id });
+      return acc;
+    }, []);
+};
+
+const toGames = (raw: unknown, providerFallbackId?: string): Game[] => {
+  const list = asArray<Record<string, unknown>>(raw);
+  return list.reduce<Game[]>((acc, item) => {
+      const provider_code =
+        (item.provider_code as string) ||
+        (item.providerCode as string) ||
+        (item.provider as string) ||
+        "";
+      const providerObject = item.provider as Record<string, unknown> | undefined;
+      const game_code = (item.game_code as string) || (item.gameCode as string) || (item.code as string) || "";
+      if (!provider_code || !game_code) return acc;
+
+      acc.push({
+        provider_code,
+        game_code,
+        provider_id:
+          (item.provider_id as string) ||
+          (item.providerId as string) ||
+          (item.provider_id_ref as string) ||
+          (item.provider_id_fk as string) ||
+          (providerObject?._id as string) ||
+          providerFallbackId ||
+          undefined,
+        game_id:
+          (item.game_id as string) ||
+          (item.gameId as string) ||
+          (item._id as string) ||
+          (item.id as string) ||
+          undefined,
+        game_type: (item.game_type as string) || (item.gameType as string) || undefined,
+        name: (item.name as string) || (item.title as string) || game_code,
+        image: (item.image as string) || (item.thumbnail as string) || undefined,
+      });
+
+      return acc;
+    }, []);
+};
 
 export default function EditSliderPage() {
-    const router = useRouter();
-    const params = useParams();
-    const sliderId = params.id as string;
+  const router = useRouter();
+  const params = useParams();
+  const sliderId = params.id as string;
 
-    const [sliderTypes, setSliderTypes] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [fetching, setFetching] = useState(true);
-    const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
-    const [imagePreview, setImagePreview] = useState("");
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [types, setTypes] = useState<SliderType[]>([]);
+  const [mode, setMode] = useState<SliderMode>("image");
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providerCode, setProviderCode] = useState("");
+  const [games, setGames] = useState<Game[]>([]);
+  const [selectedGameCode, setSelectedGameCode] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
-    const [formData, setFormData] = useState({
-        title: "",
-        subtitle: "",
-        description: "",
-        image: "",
-        sliderTypeId: "",
-        buttonText: "",
-        buttonLink: "",
-        imageRedirectLink: "",
-        order: 0,
-        isActive: true
-    });
+  const [formData, setFormData] = useState<FormDataState>(initialFormData);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch types and slider in parallel
-                const [typesRes, sliderRes] = await Promise.all([
-                    sliderTypeService.getAllSliderTypes(),
-                    sliderService.getSliderById(sliderId)
-                ]);
+  const selectedType = useMemo(
+    () => types.find((item) => item._id === formData.sliderTypeId),
+    [types, formData.sliderTypeId]
+  );
 
-                setSliderTypes(typesRes.data || []);
-                
-                const slider = sliderRes.data;
-                setFormData({
-                    title: slider.title || "",
-                    subtitle: slider.subtitle || "",
-                    description: slider.description || "",
-                    image: slider.image || "",
-                    sliderTypeId: slider.sliderTypeId || "",
-                    buttonText: slider.buttonText || "",
-                    buttonLink: slider.buttonLink || "",
-                    imageRedirectLink: slider.imageRedirectLink || "",
-                    order: slider.order || 0,
-                    isActive: slider.isActive ?? true
-                });
-                
-                if (slider.image) {
-                    setImagePreview(slider.image);
-                }
-            } catch (error) {
-                toast.error("Failed to fetch slider data");
-                router.push("/slider");
-            } finally {
-                setFetching(false);
-            }
-        };
-        fetchData();
-    }, [sliderId, router]);
+  const filteredTypes = useMemo(() => {
+    const normalize = (value?: string) => (value || "").trim().toLowerCase();
 
-    const validateField = (name: string, value: any) => {
-        switch (name) {
-            case 'title':
-                return !value ? 'Title is required' : '';
-            case 'image':
-                return !value ? 'Image is required' : '';
-            case 'sliderTypeId':
-                return !value ? 'Please select a slider type' : '';
-            case 'imageRedirectLink':
-                return !value ? 'Image redirect link is required' : '';
-            case 'buttonLink':
-                if (value && !isValidUrl(value) && !value.startsWith('/')) {
-                    return 'Please enter a valid URL or path (e.g., /products)';
-                }
-                return '';
-            default:
-                return '';
-        }
-    };
-
-    const isValidUrl = (url: string) => {
-        try {
-            new URL(url);
-            return true;
-        } catch {
-            return false;
-        }
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
-        const parsedValue = type === "number" ? parseInt(value) || 0 : value;
-        
-        setFormData(prev => ({
-            ...prev,
-            [name]: parsedValue
-        }));
-
-        const error = validateField(name, parsedValue);
-        setErrors(prev => ({ ...prev, [name]: error }));
-    };
-
-    const handleBlur = (field: string) => {
-        setTouched(prev => ({ ...prev, [field]: true }));
-        const error = validateField(field, formData[field as keyof typeof formData]);
-        setErrors(prev => ({ ...prev, [field]: error }));
-    };
-
-    const handleImageUpload = async (file: File) => {
-        if (!file.type.startsWith('image/')) {
-            toast.error('Please upload an image file');
-            return;
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error('Image size should be less than 5MB');
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const url = await uploadImageToImageBB(file);
-            setFormData(prev => ({ ...prev, image: url }));
-            setImagePreview(url);
-            setErrors(prev => ({ ...prev, image: '' }));
-            toast.success("Image uploaded successfully!");
-        } catch (error) {
-            toast.error("Failed to upload image");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-            handleImageUpload(file);
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Validate all fields
-        const newErrors: Record<string, string> = {};
-        if (!formData.title) newErrors.title = 'Title is required';
-        if (!formData.image) newErrors.image = 'Image is required';
-        if (!formData.sliderTypeId) newErrors.sliderTypeId = 'Please select a slider type';
-        if (!formData.imageRedirectLink) newErrors.imageRedirectLink = 'Image redirect link is required';
-
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
-            setTouched({
-                title: true,
-                image: true,
-                sliderTypeId: true,
-                imageRedirectLink: true
-            });
-            toast.error('Please fill in all required fields');
-            return;
-        }
-
-        try {
-            setLoading(true);
-            await sliderService.updateSlider(sliderId, formData);
-            toast.success("Slider updated successfully!");
-        } catch (error: any) {
-            toast.error( "Failed to update slider");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCancel = () => {
-        if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-            router.push('/admin/slider-controll');
-        }
-    };
-
-    const clearImage = () => {
-        setFormData(prev => ({ ...prev, image: '' }));
-        setImagePreview('');
-    };
-
-    if (fetching) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="relative">
-                        <div className="w-20 h-20 border-4 border-yellow-500/20 border-t-yellow-500 rounded-full animate-spin"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <Edit3 className="w-8 h-8 text-yellow-500 animate-pulse" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+    if (mode === "image") {
+      return types.filter((item) => IMAGE_ONLY_SLIDER_TYPES.has(normalize(item.name)));
     }
 
+    return types.filter((item) => !IMAGE_ONLY_SLIDER_TYPES.has(normalize(item.name)));
+  }, [types, mode]);
+
+  const requiredGameTypes = useMemo(() => {
+    if (!selectedType) return [];
+    const normalize = (value?: string) => (value || "").trim().toLowerCase();
+    const typeKey = normalize(selectedType.name);
+    return SLIDER_TYPE_TO_GAME_TYPE_MAP[typeKey] || [];
+  }, [selectedType]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const [typeRes, sliderRes] = await Promise.all([
+          sliderTypeService.getAllSliderTypes(),
+          sliderService.getSliderById(sliderId),
+        ]);
+
+        const loadedTypes = asArray<SliderType>(typeRes?.data);
+        const slider = (sliderRes?.data || sliderRes) as SliderResponse;
+        setTypes(loadedTypes);
+
+        const hasImage = Boolean(slider.image);
+        const hasGame = Boolean(slider.provider_code && slider.game_code);
+        const detectedMode: SliderMode = hasImage && hasGame ? "both" : hasGame ? "game" : "image";
+        setMode(detectedMode);
+
+        const resolvedSliderTypeId =
+          typeof slider.sliderTypeId === "string"
+            ? slider.sliderTypeId
+            : (slider.sliderTypeId as unknown as { _id?: string })?._id || "";
+
+        setFormData({
+          title: slider.title || "",
+          subtitle: slider.subtitle || "",
+          description: slider.description || "",
+          image: slider.image || "",
+          sliderTypeId: resolvedSliderTypeId,
+          buttonText: slider.buttonText || "",
+          buttonLink: slider.buttonLink || "",
+          imageRedirectLink: slider.imageRedirectLink || "",
+          order: slider.order || 0,
+          isActive: slider.isActive ?? true,
+          money: slider.money?.toString() || "",
+          username: slider.username || "",
+        });
+
+        if (slider.provider_code) {
+          setProviderCode(slider.provider_code);
+        }
+        if (slider.game_code) {
+          setSelectedGameCode(slider.game_code);
+        }
+      } catch {
+        toast.error("Failed to load slider");
+        router.push("/admin/slider-controll");
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    if (sliderId) {
+      void init();
+    }
+  }, [router, sliderId]);
+
+  useEffect(() => {
+    if (!formData.sliderTypeId) return;
+    if (!filteredTypes.some((item) => item._id === formData.sliderTypeId)) {
+      setFormData((prev) => ({ ...prev, sliderTypeId: "" }));
+    }
+  }, [filteredTypes, formData.sliderTypeId]);
+
+  useEffect(() => {
+    const loadProviders = async () => {
+      setProviders([]);
+      setGames([]);
+
+      if (!selectedType || (mode !== "game" && mode !== "both")) {
+        return;
+      }
+
+      const preferredCode = selectedType.providerCode?.trim();
+      if (preferredCode) {
+        const codeList = preferredCode
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const nameList = (selectedType.providerName || "")
+          .split(",")
+          .map((item) => item.trim());
+
+        const mappedProviders = codeList.map((code, index) => ({
+          code,
+          name: nameList[index] || code,
+        }));
+
+        setProviders(mappedProviders);
+        if (!providerCode) {
+          setProviderCode(mappedProviders[0]?.code || "");
+        }
+        return;
+      }
+
+      try {
+        const providerRes = await oracleService.getProviders();
+        let list = toProviders(providerRes?.data ?? providerRes?.providers ?? providerRes);
+
+        // Filter by required gameTypes if specified
+        if (requiredGameTypes.length > 0) {
+          list = list.filter((provider) => {
+            const providerData = (providerRes?.data ?? [] as any[]).find(
+              (p: any) => (p.code || p.provider_code || p.providerCode) === provider.code
+            );
+            if (!providerData?.gameType) return false;
+            const providerTypes = providerData.gameType
+              .split(",")
+              .map((t: string) => t.trim().toUpperCase());
+            return requiredGameTypes.some((type) => providerTypes.includes(type));
+          });
+        }
+
+        setProviders(list);
+      } catch {
+        toast.error("Failed to load providers");
+      }
+    };
+
+    void loadProviders();
+  }, [selectedType, mode, requiredGameTypes]);
+
+  useEffect(() => {
+    const loadGames = async () => {
+      setGames([]);
+
+      if (!providerCode || (mode !== "game" && mode !== "both")) {
+        return;
+      }
+
+      try {
+        const detailRes = await oracleService.getProviderDetails(providerCode);
+        const providerFallbackId =
+          detailRes?.data?.provider?._id ||
+          detailRes?.provider?._id ||
+          detailRes?.data?.provider_id ||
+          detailRes?.provider_id;
+        let gameList = toGames(detailRes?.data?.games ?? detailRes?.games ?? [], providerFallbackId);
+
+        // Filter games by required gameTypes
+        if (requiredGameTypes.length > 0) {
+          gameList = gameList.filter((game) => {
+            if (!game.game_type) return false;
+            const gameTypes = game.game_type
+              .split(",")
+              .map((t) => t.trim().toUpperCase());
+            return requiredGameTypes.some((type) => gameTypes.includes(type));
+          });
+        }
+
+        setGames(gameList);
+
+        if (selectedGameCode && !gameList.some((game) => game.game_code === selectedGameCode)) {
+          setSelectedGameCode("");
+        }
+      } catch {
+        toast.error("Failed to load games");
+      }
+    };
+
+    void loadGames();
+  }, [providerCode, mode, requiredGameTypes]);
+
+  const selectedGame = useMemo(
+    () => games.find((game) => game.game_code === selectedGameCode),
+    [games, selectedGameCode]
+  );
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "order" ? Number(value || 0) : value,
+    }));
+  };
+
+  const handleImageFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      const imageUrl = await uploadImageToImageBB(file);
+      setFormData((prev) => ({ ...prev, image: imageUrl }));
+      toast.success("Image uploaded");
+    } catch {
+      toast.error("Image upload failed");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const validate = (): boolean => {
+    if (!formData.sliderTypeId) {
+      toast.error("Please select a slider type");
+      return false;
+    }
+
+    if ((mode === "image" || mode === "both") && !formData.image) {
+      toast.error("Image is required for image mode");
+      return false;
+    }
+
+    if ((mode === "game" || mode === "both") && !selectedGame) {
+      toast.error("Please select a game");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    try {
+      setLoading(true);
+
+      const payload: Partial<SliderData> & { isActive?: boolean } = {
+        title: formData.title.trim() || undefined,
+        subtitle: formData.subtitle.trim() || undefined,
+        description: formData.description.trim() || undefined,
+        buttonText: formData.buttonText.trim() || undefined,
+        buttonLink: formData.buttonLink.trim() || undefined,
+        imageRedirectLink: formData.imageRedirectLink.trim() || undefined,
+        sliderTypeId: formData.sliderTypeId,
+        order: Number(formData.order) || 0,
+        isActive: formData.isActive,
+        money: formData.money ? Number(formData.money) : undefined,
+        username: formData.username.trim() || undefined,
+      };
+
+      if (mode === "image") {
+        payload.image = formData.image;
+        payload.provider_code = undefined;
+        payload.provider_id = undefined;
+        payload.game_code = undefined;
+        payload.game_id = undefined;
+        payload.game_type = undefined;
+      } else {
+        payload.image = mode === "both" ? formData.image : undefined;
+        payload.provider_code = selectedGame?.provider_code;
+        payload.provider_id = selectedGame?.provider_id;
+        payload.game_code = selectedGame?.game_code;
+        payload.game_id = selectedGame?.game_id;
+        payload.game_type = selectedGame?.game_type || selectedType?.gameType;
+
+        if (!payload.title) {
+          payload.title = selectedGame?.name || selectedGame?.game_code;
+        }
+      }
+
+      await sliderService.updateSlider(sliderId, payload);
+      toast.success("Slider updated successfully");
+      router.push("/admin/slider-controll");
+    } catch {
+      toast.error("Failed to update slider");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (initializing) {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-6">
-            <div className=" mx-auto">
-                {/* Header with breadcrumb */}
-                <div className="mb-8">
-                    <Link
-                        href="/admin/slider-controll"
-                        className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors group mb-4"
-                    >
-                        <div className="p-1.5 rounded-lg bg-gray-800 group-hover:bg-gray-700 transition-colors">
-                            <ArrowLeft className="w-4 h-4" />
-                        </div>
-                        <span>Back to Slider Management</span>
-                    </Link>
-                    
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-yellow-500/30">
-                            <Edit3 className="w-7 h-7 text-yellow-500" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-                                Edit Slider
-                            </h1>
-                            <p className="text-gray-400 mt-1 flex items-center gap-2">
-                                <ImageIcon className="w-4 h-4" />
-                                Update your slider information
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Basic Information Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
-                        <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
-                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-yellow-500" />
-                                Basic Information
-                            </h2>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {/* Title */}
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300">
-                                    Title <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <Heading1 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                                    <input
-                                        type="text"
-                                        name="title"
-                                        value={formData.title}
-                                        onChange={handleInputChange}
-                                        onBlur={() => handleBlur('title')}
-                                        placeholder="e.g., Summer Sale Banner"
-                                        className={`w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border ${
-                                            touched.title && errors.title
-                                                ? 'border-red-500/50 focus:border-red-500'
-                                                : 'border-gray-700 focus:border-yellow-500/50'
-                                        } text-white placeholder-gray-500 focus:outline-none transition-colors`}
-                                    />
-                                    {touched.title && !errors.title && formData.title && (
-                                        <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
-                                    )}
-                                </div>
-                                {touched.title && errors.title && (
-                                    <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
-                                        <AlertCircle className="w-4 h-4" />
-                                        {errors.title}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Subtitle */}
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300">
-                                    Subtitle <span className="text-gray-500 text-xs">(Optional)</span>
-                                </label>
-                                <div className="relative">
-                                    <Heading2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                                    <input
-                                        type="text"
-                                        name="subtitle"
-                                        value={formData.subtitle}
-                                        onChange={handleInputChange}
-                                        placeholder="e.g., Up to 50% off on all items"
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Description */}
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300">
-                                    Description <span className="text-gray-500 text-xs">(Optional)</span>
-                                </label>
-                                <div className="relative">
-                                    <MessageSquare className="absolute left-3 top-3 w-5 h-5 text-gray-500" />
-                                    <textarea
-                                        name="description"
-                                        value={formData.description}
-                                        onChange={handleInputChange}
-                                        placeholder="Enter detailed description for this slider..."
-                                        rows={4}
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors resize-none"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Image Upload Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
-                        <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
-                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <ImageIcon className="w-5 h-5 text-yellow-500" />
-                                Slider Image <span className="text-red-500">*</span>
-                            </h2>
-                        </div>
-
-                        <div className="p-6">
-                            {/* Upload Method Toggle */}
-                            <div className="flex gap-3 mb-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setUploadMethod("file")}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                                        uploadMethod === "file"
-                                            ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
-                                            : "bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700"
-                                    }`}
-                                >
-                                    <Upload className="w-4 h-4" />
-                                    <span>Upload File</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setUploadMethod("url")}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                                        uploadMethod === "url"
-                                            ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
-                                            : "bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700"
-                                    }`}
-                                >
-                                    <Globe className="w-4 h-4" />
-                                    <span>Image URL</span>
-                                </button>
-                            </div>
-
-                            {/* Upload Input */}
-                            {uploadMethod === "file" ? (
-                                <div className="space-y-4">
-                                    <div className="relative">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleFileChange}
-                                            className="hidden"
-                                            id="image-upload"
-                                        />
-                                        <label
-                                            htmlFor="image-upload"
-                                            className="flex flex-col items-center justify-center w-full h-40 rounded-xl border-2 border-dashed border-gray-700 hover:border-yellow-500/50 transition-colors cursor-pointer bg-gray-900/30 hover:bg-gray-900/50"
-                                        >
-                                            <Camera className="w-10 h-10 text-gray-500 mb-2" />
-                                            <span className="text-sm text-gray-400">
-                                                Click to upload or drag and drop
-                                            </span>
-                                            <span className="text-xs text-gray-500 mt-1">
-                                                PNG, JPG, GIF up to 5MB
-                                            </span>
-                                        </label>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <div className="relative">
-                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                                        <input
-                                            type="url"
-                                            name="image"
-                                            value={formData.image}
-                                            onChange={handleInputChange}
-                                            onBlur={() => handleBlur('image')}
-                                            className={`w-full pl-10 pr-10 py-3 rounded-xl bg-gray-900/50 border ${
-                                                touched.image && errors.image
-                                                    ? 'border-red-500/50 focus:border-red-500'
-                                                    : 'border-gray-700 focus:border-yellow-500/50'
-                                            } text-white placeholder-gray-500 focus:outline-none transition-colors`}
-                                            placeholder="https://example.com/image.jpg"
-                                        />
-                                        {formData.image && (
-                                            <button
-                                                type="button"
-                                                onClick={clearImage}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-400"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    {touched.image && errors.image && (
-                                        <p className="text-sm text-red-400 flex items-center gap-1">
-                                            <AlertCircle className="w-4 h-4" />
-                                            {errors.image}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Image Preview */}
-                            {(imagePreview || formData.image) && (
-                                <div className="mt-6 p-4 bg-gray-900/50 rounded-xl border border-gray-700">
-                                    <p className="text-sm text-gray-400 mb-3 flex items-center gap-2">
-                                        <Eye className="w-4 h-4" />
-                                        Current Image Preview
-                                    </p>
-                                    <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-700">
-                                        <img
-                                            src={imagePreview || formData.image}
-                                            alt="Preview"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/800x400?text=Invalid+Image';
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Slider Type Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
-                        <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
-                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <Type className="w-5 h-5 text-yellow-500" />
-                                Slider Type <span className="text-red-500">*</span>
-                            </h2>
-                        </div>
-
-                        <div className="p-6">
-                            <div className="space-y-2">
-                                <select
-                                    name="sliderTypeId"
-                                    value={formData.sliderTypeId}
-                                    onChange={handleInputChange}
-                                    onBlur={() => handleBlur('sliderTypeId')}
-                                    className={`w-full appearance-none px-4 py-3 rounded-xl bg-gray-900/50 border ${
-                                        touched.sliderTypeId && errors.sliderTypeId
-                                            ? 'border-red-500/50 focus:border-red-500'
-                                            : 'border-gray-700 focus:border-yellow-500/50'
-                                    } text-white focus:outline-none transition-colors cursor-pointer`}
-                                >
-                                    <option value="" className="bg-gray-900">Select a slider type</option>
-                                    {sliderTypes.map((type) => (
-                                        <option key={type._id} value={type._id} className="bg-gray-900">
-                                            {type.name} {!type.isActive && "(Inactive)"}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="absolute right-8 mt-[-38px] pointer-events-none">
-                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                                {touched.sliderTypeId && errors.sliderTypeId && (
-                                    <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
-                                        <AlertCircle className="w-4 h-4" />
-                                        {errors.sliderTypeId}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Button Configuration Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
-                        <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
-                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <BluetoothConnectedIcon className="w-5 h-5 text-yellow-500" />
-                                Button Configuration
-                            </h2>
-                        </div>
-
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-300">Button Text</label>
-                                    <input
-                                        type="text"
-                                        name="buttonText"
-                                        value={formData.buttonText}
-                                        onChange={handleInputChange}
-                                        placeholder="e.g., Shop Now"
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-300">Button Link</label>
-                                    <input
-                                        type="text"
-                                        name="buttonLink"
-                                        value={formData.buttonLink}
-                                        onChange={handleInputChange}
-                                        onBlur={() => handleBlur('buttonLink')}
-                                        placeholder="/products or https://"
-                                        className={`w-full px-4 py-3 rounded-xl bg-gray-900/50 border ${
-                                            touched.buttonLink && errors.buttonLink
-                                                ? 'border-red-500/50 focus:border-red-500'
-                                                : 'border-gray-700 focus:border-yellow-500/50'
-                                        } text-white placeholder-gray-500 focus:outline-none transition-colors`}
-                                    />
-                                    {touched.buttonLink && errors.buttonLink && (
-                                        <p className="text-sm text-red-400 flex items-center gap-1">
-                                            <AlertCircle className="w-4 h-4" />
-                                            {errors.buttonLink}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Redirect & Order Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
-                        <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
-                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <ExternalLink className="w-5 h-5 text-yellow-500" />
-                                Redirect & Order
-                            </h2>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {/* Image Redirect Link */}
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300">
-                                    Image Redirect Link <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <ExternalLink className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                                    <input
-                                        type="text"
-                                        name="imageRedirectLink"
-                                        value={formData.imageRedirectLink}
-                                        onChange={handleInputChange}
-                                        onBlur={() => handleBlur('imageRedirectLink')}
-                                        placeholder="/promotion or https://example.com"
-                                        className={`w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border ${
-                                            touched.imageRedirectLink && errors.imageRedirectLink
-                                                ? 'border-red-500/50 focus:border-red-500'
-                                                : 'border-gray-700 focus:border-yellow-500/50'
-                                        } text-white placeholder-gray-500 focus:outline-none transition-colors`}
-                                    />
-                                </div>
-                                {touched.imageRedirectLink && errors.imageRedirectLink && (
-                                    <p className="text-sm text-red-400 flex items-center gap-1">
-                                        <AlertCircle className="w-4 h-4" />
-                                        {errors.imageRedirectLink}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Order and Status */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-300">
-                                        Display Order
-                                    </label>
-                                    <div className="relative">
-                                        <Move className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                                        <input
-                                            type="number"
-                                            name="order"
-                                            value={formData.order}
-                                            onChange={handleInputChange}
-                                            min="0"
-                                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Lower numbers appear first
-                                    </p>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-300">Status</label>
-                                    <div className="flex items-center gap-3 h-[52px]">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}
-                                            className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none ${
-                                                formData.isActive ? 'bg-green-500' : 'bg-gray-600'
-                                            }`}
-                                        >
-                                            <span
-                                                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                                                    formData.isActive ? 'translate-x-8' : 'translate-x-1'
-                                                }`}
-                                            />
-                                        </button>
-                                        <span className={`text-sm font-medium ${
-                                            formData.isActive ? 'text-green-400' : 'text-gray-400'
-                                        }`}>
-                                            {formData.isActive ? 'Active' : 'Inactive'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Form Actions */}
-                    <div className="flex gap-3 pt-4">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 py-3 px-6 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
-                        >
-                            {loading ? (
-                                <>
-                                    <RefreshCw className="w-5 h-5 animate-spin" />
-                                    <span>Updating...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                    <span>Update Slider</span>
-                                </>
-                            )}
-                        </button>
-                        
-                        <button
-                            type="button"
-                            onClick={handleCancel}
-                            disabled={loading}
-                            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center gap-2"
-                        >
-                            <X className="w-5 h-5" />
-                            <span>Cancel</span>
-                        </button>
-                    </div>
-                </form>
-
-          
-            </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-gray-300">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-900 p-4 md:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex items-center justify-between">
+          <Link href="/admin/slider-controll" className="inline-flex items-center gap-2 text-gray-300 hover:text-white">
+            <ArrowLeft className="h-4 w-4" />
+            Back to slider control
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6">
+          <h1 className="text-2xl font-semibold text-white">Edit Slider</h1>
+          <p className="mt-1 text-sm text-gray-400">Update image and game launch configuration.</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-5">
+            <h2 className="text-lg font-semibold text-white">Slider Mode</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(["image", "game", "both"] as SliderMode[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setMode(item)}
+                  className={`rounded-xl border px-4 py-3 text-sm font-medium capitalize transition ${
+                    mode === item
+                      ? "border-yellow-500 bg-yellow-500/20 text-yellow-300"
+                      : "border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800"
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white">Slider Type</h2>
+            <select
+              name="sliderTypeId"
+              value={formData.sliderTypeId}
+              onChange={handleChange}
+              className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              required
+            >
+              <option value="">Select slider type</option>
+              {filteredTypes.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            {selectedType?.gameType ? (
+              <p className="text-sm text-gray-400">Game type: {selectedType.gameType}</p>
+            ) : null}
+          </div>
+
+          {mode !== "game" ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Basic Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder="Title"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+                <input
+                  name="subtitle"
+                  value={formData.subtitle}
+                  onChange={handleChange}
+                  placeholder="Subtitle"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+              </div>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Description"
+                rows={3}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+            </div>
+          ) : null}
+
+          {mode === "image" || mode === "both" ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Image</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="image"
+                  value={formData.image}
+                  onChange={handleChange}
+                  placeholder="Image URL"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+                <label className="inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 bg-gray-900 px-3 py-3 text-gray-300 cursor-pointer hover:border-yellow-500/60">
+                  <Upload className="h-4 w-4" />
+                  {uploadingImage ? "Uploading..." : "Upload image"}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        void handleImageFile(file);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {formData.image ? (
+                <img
+                  src={formData.image}
+                  alt="Slider preview"
+                  className="h-44 w-full rounded-xl border border-gray-700 object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src = PLACEHOLDER_IMAGE;
+                  }}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {mode !== "game" ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Button Configuration</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="buttonText"
+                  value={formData.buttonText}
+                  onChange={handleChange}
+                  placeholder="Button text"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+                <input
+                  name="buttonLink"
+                  value={formData.buttonLink}
+                  onChange={handleChange}
+                  placeholder="Button link"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {mode === "game" || mode === "both" ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Game Selection</h2>
+
+              <select
+                value={providerCode}
+                onChange={(e) => {
+                  setProviderCode(e.target.value);
+                  setSelectedGameCode("");
+                }}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              >
+                <option value="">Select provider</option>
+                {providers.map((provider) => (
+                  <option key={provider.code} value={provider.code}>
+                    {provider.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-95 overflow-auto pr-1">
+                {games.map((game) => {
+                  const selected = selectedGameCode === game.game_code;
+                  return (
+                    <button
+                      key={game.game_code}
+                      type="button"
+                      onClick={() => setSelectedGameCode(game.game_code)}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        selected
+                          ? "border-green-500 bg-green-500/10"
+                          : "border-gray-700 bg-gray-900 hover:bg-gray-800"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-sm font-medium text-white">
+                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded border ${selected ? "border-green-500 bg-green-500 text-black" : "border-gray-600"}`}>
+                          {selected ? <Check className="h-3.5 w-3.5" /> : null}
+                        </span>
+                        {game.name || game.game_code}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-400">Code: {game.game_code}</p>
+                      <p className="text-xs text-gray-500">Type: {game.game_type || selectedType?.gameType || "N/A"}</p>
+                      <img
+                        src={game.image || PLACEHOLDER_IMAGE}
+                        alt={game.name || game.game_code}
+                        className="mt-2 h-24 w-full rounded-lg border border-gray-700 object-cover"
+                        onError={(event) => {
+                          event.currentTarget.src = PLACEHOLDER_IMAGE;
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white">Launch and Order</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                name="money"
+                value={formData.money}
+                onChange={handleChange}
+                placeholder="Money (optional)"
+                type="number"
+                className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <input
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="Username (optional)"
+                className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <input
+                name="imageRedirectLink"
+                value={formData.imageRedirectLink}
+                onChange={handleChange}
+                placeholder="Image redirect link"
+                className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <input
+                name="order"
+                value={formData.order}
+                onChange={handleChange}
+                placeholder="Display order"
+                type="number"
+                className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={formData.isActive}
+                onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.checked }))}
+              />
+              Active
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={loading || uploadingImage}
+              className="inline-flex items-center gap-2 rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-black hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {loading ? "Updating..." : "Update slider"}
+            </button>
+            <Link
+              href="/admin/slider-controll"
+              className="inline-flex items-center rounded-xl border border-gray-700 bg-gray-900 px-5 py-3 text-gray-200 hover:bg-gray-800"
+            >
+              Cancel
+            </Link>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }

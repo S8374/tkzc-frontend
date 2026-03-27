@@ -4,9 +4,10 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { sliderTypeService } from "@/services/api/slider.types";
+import { SliderTypeData, sliderTypeService } from "@/services/api/slider.types";
 import { uploadImageToImageBB } from "@/lib/imageUpload";
 import toast from "react-hot-toast";
+import { oracleService } from "@/services/api/oracel.service";
 import {
     ArrowLeft,
     Upload,
@@ -27,6 +28,31 @@ import {
     FolderOpen
 } from "lucide-react";
 
+type OracleProvider = {
+    _id: string;
+    providerCode: string;
+    providerName: string;
+    gameType: string;
+};
+
+type OracleProviderResponse = {
+    success: boolean;
+    count: number;
+    data: OracleProvider[];
+};
+
+const sliderTypeToGameTypeMap: Record<string, string[]> = {
+    hot: ["SLOT", "CASINO", "FISHING"],
+    "recent-views": [],
+    "slot-game": ["SLOT"],
+    live: ["CASINO"],
+    "fishing-game": ["FISHING"],
+    lottory: ["LOTTERY"],
+    sport: ["SPORTS"],
+    "table-game": ["CASINO"],
+    promotion: []
+};
+
 export default function EditSliderTypePage() {
     const router = useRouter();
     const params = useParams();
@@ -38,6 +64,9 @@ export default function EditSliderTypePage() {
     const [iconPreview, setIconPreview] = useState("");
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [providers, setProviders] = useState<OracleProvider[]>([]);
+    const [existingProviders, setExistingProviders] = useState<OracleProvider[]>([]);
+    const [selectedProviderCodes, setSelectedProviderCodes] = useState<string[]>([]);
 
     const [formData, setFormData] = useState({
         name: "",
@@ -46,7 +75,75 @@ export default function EditSliderTypePage() {
         isActive: true
     });
 
+    const selectedSliderType = formData.name;
+    const shouldMatchProviders = selectedSliderType !== "home" && selectedSliderType !== "hero";
+
+    const mergedProviders = (() => {
+        const map = new Map<string, OracleProvider>();
+        providers.forEach((provider) => map.set(provider.providerCode, provider));
+        existingProviders.forEach((provider) => {
+            if (!map.has(provider.providerCode)) {
+                map.set(provider.providerCode, provider);
+            }
+        });
+        return Array.from(map.values());
+    })();
+
+    const matchedProviders = shouldMatchProviders
+        ? mergedProviders.filter((provider) => {
+            const gameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
+            if (!gameTypes.length) return false;
+
+            const providerTypes = provider.gameType
+                .split(",")
+                .map((type) => type.trim().toUpperCase());
+
+            return gameTypes.some((type) => providerTypes.includes(type));
+        })
+        : [];
+
+    const providerSelectionPool = shouldMatchProviders
+        ? (() => {
+            const gameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
+            if (!gameTypes.length) return mergedProviders;
+
+            const selectedFromMerged = mergedProviders.filter((provider) =>
+                selectedProviderCodes.includes(provider.providerCode)
+            );
+
+            const map = new Map<string, OracleProvider>();
+            matchedProviders.forEach((provider) => map.set(provider.providerCode, provider));
+            selectedFromMerged.forEach((provider) => map.set(provider.providerCode, provider));
+            return Array.from(map.values());
+        })()
+        : [];
+
+    const toggleProviderSelection = (providerCode: string) => {
+        setSelectedProviderCodes((prev) =>
+            prev.includes(providerCode)
+                ? prev.filter((code) => code !== providerCode)
+                : [...prev, providerCode]
+        );
+    };
+
+    const selectAllProviders = () => {
+        setSelectedProviderCodes(providerSelectionPool.map((provider) => provider.providerCode));
+    };
+
+    const clearSelectedProviders = () => {
+        setSelectedProviderCodes([]);
+    };
+
     useEffect(() => {
+        const fetchProviders = async () => {
+            try {
+                const response = await oracleService.getProviders() as OracleProviderResponse;
+                setProviders(response?.data || []);
+            } catch (error) {
+                console.error("Failed to fetch providers:", error);
+            }
+        };
+
         const fetchType = async () => {
             try {
                 const res = await sliderTypeService.getSliderTypeById(typeId);
@@ -57,6 +154,30 @@ export default function EditSliderTypePage() {
                     iconUrl: type.iconUrl || "",
                     isActive: type.isActive ?? true
                 });
+                setSelectedProviderCodes(
+                    (type.providerCode || "")
+                        .split(",")
+                        .map((code: string) => code.trim())
+                        .filter(Boolean)
+                );
+
+                const providerCodes = (type.providerCode || "")
+                    .split(",")
+                    .map((code: string) => code.trim())
+                    .filter(Boolean);
+                const providerNames = (type.providerName || "")
+                    .split(",")
+                    .map((name: string) => name.trim());
+
+                setExistingProviders(
+                    providerCodes.map((code: string, index: number) => ({
+                        _id: `existing-${code}`,
+                        providerCode: code,
+                        providerName: providerNames[index] || code,
+                        gameType: ""
+                    }))
+                );
+
                 if (type.iconUrl) {
                     setIconPreview(type.iconUrl);
                 }
@@ -67,6 +188,8 @@ export default function EditSliderTypePage() {
                 setFetching(false);
             }
         };
+
+        fetchProviders();
         fetchType();
     }, [typeId, router]);
 
@@ -160,9 +283,40 @@ export default function EditSliderTypePage() {
             return;
         }
 
+        if (shouldMatchProviders && providerSelectionPool.length > 0 && selectedProviderCodes.length === 0) {
+            toast.error('Please select at least one provider');
+            return;
+        }
+
         try {
             setLoading(true);
-            await sliderTypeService.updateSliderType(typeId, formData);
+            const selectedProviders = mergedProviders.filter((provider) =>
+                selectedProviderCodes.includes(provider.providerCode)
+            );
+
+            const uniqueGameTypes = Array.from(
+                new Set(
+                    selectedProviders.flatMap((provider) =>
+                        provider.gameType
+                            .split(",")
+                            .map((type) => type.trim().toUpperCase())
+                            .filter(Boolean)
+                    )
+                )
+            );
+
+            const payload: Partial<SliderTypeData> = {
+                ...formData,
+                gameType: uniqueGameTypes.length ? uniqueGameTypes.join(",") : undefined,
+                providerCode: selectedProviders.length
+                    ? selectedProviders.map((provider) => provider.providerCode).join(",")
+                    : undefined,
+                providerName: selectedProviders.length
+                    ? selectedProviders.map((provider) => provider.providerName).join(",")
+                    : undefined
+            };
+
+            await sliderTypeService.updateSliderType(typeId, payload);
             toast.success('Slider type updated successfully!');
             router.push('/admin/slider-controll');
         } catch (error: any) {
@@ -279,6 +433,69 @@ export default function EditSliderTypePage() {
                                     </p>
                                 )}
                             </div>
+
+                            {selectedSliderType && shouldMatchProviders && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label className="block text-sm font-medium text-gray-300">
+                                            Providers
+                                        </label>
+                                        <span className="text-xs px-2 py-1 rounded-md bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                            {selectedProviderCodes.length}/{providerSelectionPool.length}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={selectAllProviders}
+                                            className="text-xs px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors"
+                                        >
+                                            Select All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={clearSelectedProviders}
+                                            className="text-xs px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+
+                                    {providerSelectionPool.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-2 max-h-44 overflow-auto pr-1 rounded-xl border border-gray-700 bg-gray-900/40 p-3">
+                                            {providerSelectionPool.map((provider) => {
+                                                const isSelected = selectedProviderCodes.includes(provider.providerCode);
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={provider._id}
+                                                        onClick={() => toggleProviderSelection(provider.providerCode)}
+                                                        className={`text-xs px-2 py-1 rounded-md border transition-colors ${isSelected
+                                                            ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300'
+                                                            : 'bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700'
+                                                            }`}
+                                                    >
+                                                        {provider.providerName}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            No provider matches this slider type.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {selectedSliderType && !shouldMatchProviders && (
+                                <div className="mt-1 rounded-xl border border-gray-700 bg-gray-900/40 p-3">
+                                    <p className="text-xs text-gray-400">
+                                        Provider matching is not required for Home and Hero.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Description Field */}
                             <div className="space-y-2">

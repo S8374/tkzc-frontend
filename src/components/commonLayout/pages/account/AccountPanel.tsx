@@ -30,11 +30,7 @@ export default function ProfileWallet() {
 
       toast.success("Logged out successfully 👋");
 
-      // optional redirect
-      router.push("/");
-
-      // 🔥 Force header refresh without page reload
-      window.location.reload();
+      router.replace("/");
 
     } catch (error) {
       toast.error("Logout failed");

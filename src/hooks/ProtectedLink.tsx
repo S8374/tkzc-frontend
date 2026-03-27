@@ -19,7 +19,7 @@ export default function ProtectedLink({ href, children }: Props) {
     try {
       const res = await authService.me(undefined);
 
-      if (res?.statusCode === 200) {
+      if (res?.success && res?.data) {
         // ✅ user valid → go
         router.push(href);
       } else {

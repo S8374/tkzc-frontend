@@ -71,10 +71,13 @@ const ItemsCard = ({
               style={{ height: cardHeight }}
             >
               <img
-                src={item.imageUrl}
+                src={item.imageUrl || "https://via.placeholder.com/300x200?text=No+Image"}
                 alt={item.title}
-                className="absolute inset-0 w-full h-full bg-no-repeat bg-cover bg-contain  transition-transform duration-300 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "https://via.placeholder.com/300x200?text=No+Image";
+                }}
               />
             </div>
 

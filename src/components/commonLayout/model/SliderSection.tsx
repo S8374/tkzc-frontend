@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import CardSlider from "@/components/reUseAbleItems/CardSlider";
 import { sliderService } from "@/services/api/slider.service";
+import { oracleService } from "@/services/api/oracel.service";
 
 const SliderSection = ({
   type,
@@ -23,11 +24,39 @@ const SliderSection = ({
         const res = await sliderService.getAllSliders({ type });
 
         if (res?.success && res?.data) {
-          const mapped = res.data.map((item: any) => ({
+          const sliders: any[] = res.data;
+          const providerCodes = Array.from(
+            new Set(
+              sliders
+                .filter((item: any) => !item.image && item.provider_code && item.game_code)
+                .map((item: any) => item.provider_code)
+            )
+          );
+
+          let gameImageMap: Record<string, string> = {};
+          if (providerCodes.length) {
+            const detailsList = await Promise.all(
+              providerCodes.map((providerCode) => oracleService.getProviderDetails(providerCode))
+            );
+
+            detailsList.forEach((details: any) => {
+              const games = details?.games || [];
+              games.forEach((game: any) => {
+                if (game?.provider_code && game?.game_code && game?.image) {
+                  gameImageMap[`${game.provider_code}:${game.game_code}`] = game.image;
+                }
+              });
+            });
+          }
+
+          const mapped = sliders.map((item: any) => ({
             id: item._id,
             title: item.title,
             subtitle: item.subtitle,
-            imageUrl: item.image,
+            imageUrl:
+              item.image ||
+              gameImageMap[`${item.provider_code}:${item.game_code}`] ||
+              "https://via.placeholder.com/300x200?text=No+Image",
           }));
 
           setItems(mapped);

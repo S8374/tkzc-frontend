@@ -14,10 +14,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { authService } from "@/services/api/auth.services";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function DashboardHeader() {
+  const router = useRouter();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [notifications] = useState(3); // Example notification count
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout(undefined);
+      toast.success("Logged out successfully");
+      router.replace("/");
+    } catch {
+      toast.error("Logout failed");
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 h-16 w-full bg-gradient-to-r from-[#0f2b3f] to-[#1f3d5b] border-b border-white/10 shadow-lg backdrop-blur-sm">
@@ -156,7 +170,10 @@ export default function DashboardHeader() {
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer text-red-600 hover:text-red-700">
+              <DropdownMenuItem
+                className="cursor-pointer text-red-600 hover:text-red-700"
+                onClick={handleLogout}
+              >
                 <LogOutIcon className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
