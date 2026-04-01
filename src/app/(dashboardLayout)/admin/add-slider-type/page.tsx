@@ -38,8 +38,6 @@ type OracleProviderResponse = {
 };
 
 const sliderTypeToGameTypeMap: Record<string, string[]> = {
-    home: [],
-    hero: [],
     hot: ["SLOT", "CASINO", "FISHING"],
     "recent-views": [],
     "slot-game": ["SLOT"],
@@ -79,8 +77,7 @@ const CreateSliderTypePage = () => {
     }, []);
 
     const selectedSliderType = formData.name;
-    const imageOnlyTypes = new Set(["home", "hero", "promotion"]);
-    const shouldMatchProviders = !imageOnlyTypes.has(selectedSliderType);
+    const shouldMatchProviders = selectedSliderType !== "home" && selectedSliderType !== "hero";
 
     const matchedProviders = shouldMatchProviders
         ? providers.filter((provider) => {
@@ -102,13 +99,9 @@ const CreateSliderTypePage = () => {
         })()
         : [];
 
-    const imageTypeOptions = [
+    const sliderTypeOptions = [
         { id: "home", label: "Home", icon: "🏠" },
         { id: "hero", label: "Hero", icon: "⭐" },
-        { id: "promotion", label: "Promotion", icon: "🎁" },
-    ];
-
-    const gameTypeOptions = [
         { id: "hot", label: "Hot", icon: "🔥" },
         { id: "recent-views", label: "Recent Views", icon: "👁️" },
         { id: "slot-game", label: "Slot Game", icon: "🎰" },
@@ -117,6 +110,7 @@ const CreateSliderTypePage = () => {
         { id: "lottory", label: "Lottory", icon: "🎲" },
         { id: "sport", label: "Sport", icon: "⚽" },
         { id: "table-game", label: "Table Game", icon: "🎯" },
+        { id: "promotion", label: "Promotion", icon: "🎯" },
     ];
 
     const validateField = (name: string, value: string) => {
@@ -202,19 +196,16 @@ const CreateSliderTypePage = () => {
             setLoading(true);
             const selectedProviders = providerSelectionPool;
 
-            const mappedGameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
-            const uniqueGameTypes = mappedGameTypes.length
-                ? mappedGameTypes
-                : Array.from(
-                    new Set(
-                        selectedProviders.flatMap((provider) =>
-                            provider.gameType
-                                .split(",")
-                                .map((type) => type.trim().toUpperCase())
-                                .filter(Boolean)
-                        )
+            const uniqueGameTypes = Array.from(
+                new Set(
+                    selectedProviders.flatMap((provider) =>
+                        provider.gameType
+                            .split(",")
+                            .map((type) => type.trim().toUpperCase())
+                            .filter(Boolean)
                     )
-                );
+                )
+            );
 
             const payload: SliderTypeData = {
                 ...formData,
@@ -269,7 +260,7 @@ const CreateSliderTypePage = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-                                Create Slider Type And Game Type
+                                Create Slider Type
                             </h1>
                             <p className="text-gray-400 mt-1 flex items-center gap-2">
                                 <Type className="w-4 h-4" />
@@ -308,20 +299,11 @@ const CreateSliderTypePage = () => {
                                             } text-white focus:outline-none transition-colors cursor-pointer`}
                                     >
                                         <option value="" className="bg-gray-900">Select a slider type</option>
-                                        <optgroup label="Image Types">
-                                            {imageTypeOptions.map((type) => (
-                                                <option key={type.id} value={type.id} className="bg-gray-900">
-                                                    {type.icon} {type.label}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                        <optgroup label="Game Types">
-                                            {gameTypeOptions.map((type) => (
-                                                <option key={type.id} value={type.id} className="bg-gray-900">
-                                                    {type.icon} {type.label}
-                                                </option>
-                                            ))}
-                                        </optgroup>
+                                        {sliderTypeOptions.map((type) => (
+                                            <option key={type.id} value={type.id} className="bg-gray-900">
+                                                {type.icon} {type.label}
+                                            </option>
+                                        ))}
                                     </select>
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                                         <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

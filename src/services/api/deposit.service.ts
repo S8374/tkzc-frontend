@@ -8,6 +8,7 @@ export interface PaymentMethod {
   icon: string;
   tab: string;
   description?: string;
+  tournOver: number;
   order: number;
   isActive: boolean;
   createdAt?: string;
@@ -20,6 +21,7 @@ export interface PaymentMethodData {
   icon: string;
   tab: string;
   description?: string;
+  tournOver?: number;
   order?: number;
   isActive?: boolean;
 }

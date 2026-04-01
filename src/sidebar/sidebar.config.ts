@@ -50,6 +50,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         items: [
           { title: "Deposite Handel", url: "/admin/add-deposite", icon: Settings },
           { title: "Deposite Request", url: "/admin/deposit-request", icon: Settings },
+          { title: "Withdraw Request", url: "/admin/withdraw-request", icon: Settings },
         ],
       },
       {

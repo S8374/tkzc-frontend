@@ -35,6 +35,7 @@ interface PaymentMethod {
   icon: string;
   tab: TabType;
   description?: string;
+  tournOver: number;
   order: number;
   isActive: boolean;
 }
@@ -76,6 +77,12 @@ interface Tittle {
 // Helper function to generate slug from name
 const generateSlug = (text: string) => {
   if (!text) return '';
+
+  const normalizedText = text.trim();
+  if (normalizedText.includes('বিকাশ')) return 'bkash';
+  if (normalizedText.includes('নগদ')) return 'nagad';
+  if (normalizedText.includes('রকেট')) return 'rocket';
+
   return text
     .toLowerCase()
     .replace(/\s+/g, '-')
@@ -83,6 +90,29 @@ const generateSlug = (text: string) => {
     .replace(/\-\-+/g, '-')
     .replace(/^-+/, '')
     .replace(/-+$/, '');
+};
+
+type MethodLanguage = 'en' | 'bn';
+type MethodKey = 'nagad' | 'bkash' | 'rocket';
+
+const METHOD_NAME_OPTIONS: Array<{ key: MethodKey; en: string; bn: string }> = [
+  { key: 'nagad', en: 'Nagad', bn: 'নগদ' },
+  { key: 'bkash', en: 'bKash', bn: 'বিকাশ' },
+  { key: 'rocket', en: 'Rocket', bn: 'রকেট' },
+];
+
+const getMethodNameBySelection = (methodKey: MethodKey, language: MethodLanguage) => {
+  const method = METHOD_NAME_OPTIONS.find((item) => item.key === methodKey);
+  if (!method) return '';
+  return language === 'bn' ? method.bn : method.en;
+};
+
+const detectMethodKeyFromName = (name: string): MethodKey | null => {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === 'nagad' || name.includes('নগদ')) return 'nagad';
+  if (normalized === 'bkash' || name.includes('বিকাশ')) return 'bkash';
+  if (normalized === 'rocket' || name.includes('রকেট')) return 'rocket';
+  return null;
 };
 
 export default function DepositManagement() {
@@ -116,9 +146,12 @@ export default function DepositManagement() {
     slug: '',
     icon: '',
     description: '',
+    tournOver: 0,
     order: 0,
     isActive: true
   });
+  const [methodLanguage, setMethodLanguage] = useState<MethodLanguage>('en');
+  const [selectedMethodKey, setSelectedMethodKey] = useState<MethodKey>('nagad');
 
   const [instructionForm, setInstructionForm] = useState({
     step: 1,
@@ -169,6 +202,19 @@ export default function DepositManagement() {
       }));
     }
   }, [methodForm.name, editingItem]);
+
+  // Auto-fill name and slug from dropdown selection when adding a method.
+  useEffect(() => {
+    if (editingItem) return;
+    const selectedName = getMethodNameBySelection(selectedMethodKey, methodLanguage);
+    if (!selectedName) return;
+
+    setMethodForm(prev => ({
+      ...prev,
+      name: selectedName,
+      slug: generateSlug(selectedName),
+    }));
+  }, [selectedMethodKey, methodLanguage, editingItem]);
 
   // Fetch data based on active tab
   useEffect(() => {
@@ -305,6 +351,7 @@ export default function DepositManagement() {
         slug: slug,
         icon: methodForm.icon,
         description: methodForm.description,
+        tournOver: Number(methodForm.tournOver) || 0,
         order: methodForm.order,
         isActive: methodForm.isActive,
         tab: activeTab
@@ -337,6 +384,7 @@ export default function DepositManagement() {
         slug: slug,
         icon: methodForm.icon,
         description: methodForm.description,
+        tournOver: Number(methodForm.tournOver) || 0,
         order: methodForm.order,
         isActive: methodForm.isActive
       });
@@ -902,9 +950,12 @@ export default function DepositManagement() {
       slug: '',
       icon: '',
       description: '',
+      tournOver: 0,
       order: 0,
       isActive: true
     });
+    setMethodLanguage('en');
+    setSelectedMethodKey('nagad');
     setMethodIconUploadStatus('idle');
   };
   const resetInstructionForm = () => {
@@ -958,11 +1009,17 @@ export default function DepositManagement() {
 
   const openEditMethod = (method: PaymentMethod) => {
     setEditingItem(method);
+    const detectedKey = detectMethodKeyFromName(method.name);
+    if (detectedKey) {
+      setSelectedMethodKey(detectedKey);
+      setMethodLanguage(method.name === getMethodNameBySelection(detectedKey, 'bn') ? 'bn' : 'en');
+    }
     setMethodForm({
       name: method.name,
       slug: method.slug,
       icon: method.icon,
       description: method.description || '',
+      tournOver: method.tournOver ?? 0,
       order: method.order,
       isActive: method.isActive
     });
@@ -1238,7 +1295,8 @@ export default function DepositManagement() {
                   {method.description && (
                     <p className="text-gray-300 text-sm mt-2">{method.description}</p>
                   )}
-                  <p className="text-xs text-gray-400 mt-2">Order: {method.order}</p>
+                  <p className="text-xs text-gray-400 mt-2">Turnover: {method.tournOver}</p>
+                  <p className="text-xs text-gray-400">Order: {method.order}</p>
                 </div>
               ))}
               {paymentMethods.length === 0 && (
@@ -1613,6 +1671,37 @@ export default function DepositManagement() {
               e.preventDefault();
               editingItem ? handleUpdateMethod() : handleCreateMethod();
             }} className="space-y-4">
+              {!editingItem && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Language *</label>
+                    <select
+                      value={methodLanguage}
+                      onChange={(e) => setMethodLanguage(e.target.value as MethodLanguage)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    >
+                      <option value="en">English</option>
+                      <option value="bn">Bangla</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Method *</label>
+                    <select
+                      value={selectedMethodKey}
+                      onChange={(e) => setSelectedMethodKey(e.target.value as MethodKey)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                    >
+                      {METHOD_NAME_OPTIONS.map((item) => (
+                        <option key={item.key} value={item.key}>
+                          {methodLanguage === 'bn' ? item.bn : item.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Name *</label>
@@ -1758,6 +1847,19 @@ export default function DepositManagement() {
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                   placeholder="Optional description"
+                />
+              </div>
+
+              {/* Order */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Turnover</label>
+                <input
+                  type="number"
+                  value={methodForm.tournOver}
+                  onChange={(e) => setMethodForm({ ...methodForm, tournOver: Number(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                  min="0"
+                  step="any"
                 />
               </div>
 

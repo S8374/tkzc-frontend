@@ -82,20 +82,6 @@ const initialFormData: FormDataState = {
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x220?text=No+Image";
 const IMAGE_ONLY_SLIDER_TYPES = new Set(["home", "hero", "promotion"]);
 
-const SLIDER_TYPE_TO_GAME_TYPE_MAP: Record<string, string[]> = {
-  home: [],
-  hero: [],
-  hot: ["SLOT", "CASINO", "FISHING"],
-  "recent-views": [],
-  "slot-game": ["SLOT"],
-  live: ["CASINO"],
-  "fishing-game": ["FISHING"],
-  lottory: ["LOTTERY"],
-  sport: ["SPORTS"],
-  "table-game": ["CASINO"],
-  promotion: [],
-};
-
 const asArray = <T,>(value: unknown): T[] => {
   if (Array.isArray(value)) return value as T[];
   return [];
@@ -190,13 +176,6 @@ export default function EditSliderPage() {
 
     return types.filter((item) => !IMAGE_ONLY_SLIDER_TYPES.has(normalize(item.name)));
   }, [types, mode]);
-
-  const requiredGameTypes = useMemo(() => {
-    if (!selectedType) return [];
-    const normalize = (value?: string) => (value || "").trim().toLowerCase();
-    const typeKey = normalize(selectedType.name);
-    return SLIDER_TYPE_TO_GAME_TYPE_MAP[typeKey] || [];
-  }, [selectedType]);
 
   useEffect(() => {
     const init = async () => {
@@ -294,22 +273,7 @@ export default function EditSliderPage() {
 
       try {
         const providerRes = await oracleService.getProviders();
-        let list = toProviders(providerRes?.data ?? providerRes?.providers ?? providerRes);
-
-        // Filter by required gameTypes if specified
-        if (requiredGameTypes.length > 0) {
-          list = list.filter((provider) => {
-            const providerData = (providerRes?.data ?? [] as any[]).find(
-              (p: any) => (p.code || p.provider_code || p.providerCode) === provider.code
-            );
-            if (!providerData?.gameType) return false;
-            const providerTypes = providerData.gameType
-              .split(",")
-              .map((t: string) => t.trim().toUpperCase());
-            return requiredGameTypes.some((type) => providerTypes.includes(type));
-          });
-        }
-
+        const list = toProviders(providerRes?.data ?? providerRes?.providers ?? providerRes);
         setProviders(list);
       } catch {
         toast.error("Failed to load providers");
@@ -317,7 +281,7 @@ export default function EditSliderPage() {
     };
 
     void loadProviders();
-  }, [selectedType, mode, requiredGameTypes]);
+  }, [selectedType, mode]);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -334,19 +298,7 @@ export default function EditSliderPage() {
           detailRes?.provider?._id ||
           detailRes?.data?.provider_id ||
           detailRes?.provider_id;
-        let gameList = toGames(detailRes?.data?.games ?? detailRes?.games ?? [], providerFallbackId);
-
-        // Filter games by required gameTypes
-        if (requiredGameTypes.length > 0) {
-          gameList = gameList.filter((game) => {
-            if (!game.game_type) return false;
-            const gameTypes = game.game_type
-              .split(",")
-              .map((t) => t.trim().toUpperCase());
-            return requiredGameTypes.some((type) => gameTypes.includes(type));
-          });
-        }
-
+        const gameList = toGames(detailRes?.data?.games ?? detailRes?.games ?? [], providerFallbackId);
         setGames(gameList);
 
         if (selectedGameCode && !gameList.some((game) => game.game_code === selectedGameCode)) {
@@ -358,7 +310,7 @@ export default function EditSliderPage() {
     };
 
     void loadGames();
-  }, [providerCode, mode, requiredGameTypes]);
+  }, [providerCode, mode]);
 
   const selectedGame = useMemo(
     () => games.find((game) => game.game_code === selectedGameCode),

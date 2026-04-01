@@ -19,6 +19,8 @@ export interface DepositRequest {
   promotionType?: 'PERCENT' | 'FIXED';
   promotionValue?: number;
   bonusAmount?: number;
+  turnoverMultiplier?: number;
+  turnoverRequired?: number;
   formData: Record<string, any>;
   screenshot?: string;
   transactionId?: string;
@@ -43,6 +45,8 @@ export interface DepositRequestData {
   promotionName?: string;
   promotionType?: 'PERCENT' | 'FIXED';
   promotionValue?: number;
+  turnoverMultiplier?: number;
+  turnoverRequired?: number;
   formData: Record<string, any>;
   screenshot?: string;
   transactionId?: string;

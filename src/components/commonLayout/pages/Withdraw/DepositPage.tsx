@@ -39,6 +39,7 @@ interface PaymentMethod {
   icon: string;
   tab: Tab;
   description?: string;
+  tournOver: number;
   order: number;
   isActive: boolean;
 }
@@ -106,6 +107,7 @@ export default function DepositPage() {
   const [bonusField, setBonusField] = useState<FormField | null>(null);
   const [bonusFieldValue, setBonusFieldValue] = useState<string>("");
   const [bonusFieldError, setBonusFieldError] = useState<string | null>(null);
+  const [calculatedTurnover, setCalculatedTurnover] = useState<number | null>(null);
   const [tittle, setTittle] = useState<Tittle | null>(null);
 
   // Form state - will store all form field values dynamically
@@ -133,6 +135,7 @@ export default function DepositPage() {
     setAmountError(null);
     setBonusFieldError(null);
     setBonusFieldValue("");
+    setCalculatedTurnover(null);
     setSelectedMethod(null);
     setUploadStatus('idle');
     setUploadedFileUrl("");
@@ -289,6 +292,24 @@ export default function DepositPage() {
     }
   }, [bonusFieldValue, selectedPromotion]);
 
+  // Calculate turnover requirement for manual deposits only.
+  useEffect(() => {
+    if (activeTab !== "manual" || !selectedMethod || !amountFieldName) {
+      setCalculatedTurnover(null);
+      return;
+    }
+
+    const amount = Number(formData[amountFieldName]);
+    const tournOverMultiplier = Number(selectedMethod.tournOver || 0);
+
+    if (Number.isNaN(amount) || amount <= 0 || tournOverMultiplier <= 0) {
+      setCalculatedTurnover(null);
+      return;
+    }
+
+    setCalculatedTurnover(amount * tournOverMultiplier);
+  }, [activeTab, selectedMethod, amountFieldName, formData]);
+
   // Update minDeposit and maxBonus when promotion changes
   useEffect(() => {
     if (selectedPromotion) {
@@ -422,6 +443,7 @@ export default function DepositPage() {
     setAmountError(null);
     setBonusFieldError(null);
     setBonusFieldValue("");
+    setCalculatedTurnover(null);
     setAmountFieldName("");
     setAmountField(null);
     setBonusField(null);
@@ -526,12 +548,29 @@ export default function DepositPage() {
     try {
       setSubmitting(true);
 
+      let localTurnoverRequired: number | null = null;
+
       const requestData: any = {
         depositType: activeTab,
         paymentMethod: selectedMethod.name,
         amount: amount,
         formData: formData,
       };
+
+      if (activeTab === 'manual') {
+        const tournOverMultiplier = Number(selectedMethod.tournOver || 0);
+        if (tournOverMultiplier > 0) {
+          const turnoverRequired = amount * tournOverMultiplier;
+          localTurnoverRequired = turnoverRequired;
+          requestData.turnoverMultiplier = tournOverMultiplier;
+          requestData.turnoverRequired = turnoverRequired;
+          requestData.formData = {
+            ...formData,
+            turnoverMultiplier: tournOverMultiplier,
+            turnoverRequired,
+          };
+        }
+      }
 
       if (selectedPromotion && calculatedBonus) {
         requestData.promotionId = selectedPromotion._id;
@@ -594,7 +633,10 @@ export default function DepositPage() {
       const response = await depositRequestService.createRequest(requestData);
 
       if (response?.success) {
-        setSubmittedRequest(response.data);
+        setSubmittedRequest({
+          ...response.data,
+          turnoverRequired: response.data?.turnoverRequired ?? localTurnoverRequired,
+        });
         setShowSuccessModal(true);
 
         const initialData: Record<string, string> = {};
@@ -613,6 +655,7 @@ export default function DepositPage() {
         setAmountError(null);
         setBonusFieldError(null);
         setBonusFieldValue("");
+        setCalculatedTurnover(null);
         setUploadStatus('idle');
         setUploadedFileUrl("");
 
@@ -916,6 +959,17 @@ export default function DepositPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedMethod && Number(selectedMethod.tournOver || 0) > 0 && (
+              <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-3">
+                <p className="text-xs text-emerald-300">
+                  Turnover Multiplier: {selectedMethod.tournOver}x
+                </p>
+                <p className="text-sm text-white mt-1">
+                  Required Turnover: {calculatedTurnover ? `৳${calculatedTurnover.toFixed(2)}` : 'Enter amount to calculate'}
+                </p>
               </div>
             )}
 
@@ -1579,6 +1633,14 @@ export default function DepositPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-400">Bonus:</span>
                   <span className="text-green-400 font-bold">+ ৳{submittedRequest.bonusAmount}</span>
+                </div>
+              )}
+              {(submittedRequest.turnoverRequired ?? calculatedTurnover ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Turnover:</span>
+                  <span className="text-emerald-400 font-bold">
+                    ৳{Number(submittedRequest.turnoverRequired ?? calculatedTurnover).toFixed(2)}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between">
