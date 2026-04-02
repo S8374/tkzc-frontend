@@ -22,13 +22,16 @@ import {
   Type,
   Info,
   Check,
-  CreditCard
+  CreditCard,
+  Loader2
 } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import { depositService } from "@/services/api/deposit.service";
 import { useRouter } from "next/navigation";
 import { Promotion, promotionService } from "@/services/api/promotion.service";
 import { depositRequestService } from "@/services/api/depositRequest.service";
+import { oraclePayService } from "@/services/api/oraclepay.service";
+import { useAuth } from "@/context/AuthContext";
 
 type Tab = "manual" | "auto" | "crypto";
 
@@ -87,8 +90,13 @@ interface ExtendedPromotion extends Promotion {
   } | string;
 }
 
+const AUTO_AMOUNT_PRESETS = [200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+const AUTO_DEPOSIT_MIN = 5;
+const DEFAULT_AUTO_DEPOSIT_MAX = 500000;
+
 export default function DepositPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("manual");
   const [copied, setCopied] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -109,6 +117,8 @@ export default function DepositPage() {
   const [bonusFieldError, setBonusFieldError] = useState<string | null>(null);
   const [calculatedTurnover, setCalculatedTurnover] = useState<number | null>(null);
   const [tittle, setTittle] = useState<Tittle | null>(null);
+  const [autoDepositAmount, setAutoDepositAmount] = useState<string>("");
+  const [autoDepositMax, setAutoDepositMax] = useState<number>(DEFAULT_AUTO_DEPOSIT_MAX);
 
   // Form state - will store all form field values dynamically
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -143,6 +153,7 @@ export default function DepositPage() {
     setAmountField(null);
     setBonusField(null);
     setTittle(null);
+    setAutoDepositAmount("");
     setFormData({});
     setFilteredFormFields([]);
     setFilteredInstructions([]);
@@ -176,13 +187,16 @@ export default function DepositPage() {
         // 1. Linked to this payment method
         // 2. Not linked to any payment method
         fieldsToShow = allFormFields.filter(field => 
-          !field.paymentMethodId || field.paymentMethodId === selectedMethod._id
+          (!field.paymentMethodId || field.paymentMethodId === selectedMethod._id) &&
+          (activeTab !== "auto" || !field.isBonusField)
         );
         
         console.log(`Showing fields for ${selectedMethod.name}:`, fieldsToShow);
       } else {
         // Show ALL fields when no method selected
-        fieldsToShow = allFormFields;
+        fieldsToShow = activeTab === "auto"
+          ? allFormFields.filter(field => !field.isBonusField)
+          : allFormFields;
         console.log("No method selected, showing all fields:", fieldsToShow);
       }
       
@@ -206,6 +220,16 @@ export default function DepositPage() {
   useEffect(() => {
     fetchTabData();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "auto") {
+      setAutoDepositMax(DEFAULT_AUTO_DEPOSIT_MAX);
+      return;
+    }
+
+    const configuredMax = promotions.find((promotion) => promotion.isActive && typeof promotion.maxBonus === 'number' && promotion.maxBonus > 0)?.maxBonus;
+    setAutoDepositMax(configuredMax || DEFAULT_AUTO_DEPOSIT_MAX);
+  }, [activeTab, promotions]);
 
   // Find the amount field and bonus field whenever filtered form fields change
   useEffect(() => {
@@ -367,12 +391,14 @@ export default function DepositPage() {
         console.log("Initialized form data with fields:", Object.keys(initialData));
       }
 
-      // Fetch promotions
+      // Fetch promotions for the current tab so auto deposit can read its max value.
       const promotionsRes = await promotionService.getPromotionsByTab(activeTab);
       console.log("Promotions:", promotionsRes);
 
       if (promotionsRes?.success) {
         setPromotions(promotionsRes.data || []);
+      } else {
+        setPromotions([]);
       }
 
     } catch (error) {
@@ -475,6 +501,15 @@ export default function DepositPage() {
     }
   };
 
+  const handleAutoAmountSelect = (value: number) => {
+    const nextAmount = String(value);
+    setAutoDepositAmount(nextAmount);
+
+    if (amountFieldName) {
+      handleInputChange(amountFieldName, nextAmount);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -493,6 +528,54 @@ export default function DepositPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (activeTab === "auto") {
+      try {
+        setSubmitting(true);
+
+        const amount = Number(autoDepositAmount || formData[amountFieldName]);
+        if (!Number.isFinite(amount) || amount < AUTO_DEPOSIT_MIN) {
+          alert(`Please enter a valid amount of at least ৳${AUTO_DEPOSIT_MIN}`);
+          return;
+        }
+
+        if (amount > autoDepositMax) {
+          alert(`Maximum deposit amount is ৳${autoDepositMax.toLocaleString()}`);
+          return;
+        }
+
+        const invoiceNumber = `API-TEST-${Date.now()}`;
+        const userIdentityAddress = user?.email || user?.id || "customer@example.com";
+        const callbackUrl = `${window.location.origin}/api/payment/oraclepay-callback`;
+        const successRedirectUrl = `${window.location.origin}/deposit?status=success`;
+
+        const response = await oraclePayService.generatePaymentPage({
+          payment_amount: amount,
+          user_identity_address: userIdentityAddress,
+          callback_url: callbackUrl,
+          success_redirect_url: successRedirectUrl,
+          invoice_number: invoiceNumber,
+          checkout_items: {
+            type: "Auto Deposit",
+            initiator: "Merchant Dashboard",
+          },
+        });
+
+        if (response?.success && response.payment_page_url) {
+          window.location.href = response.payment_page_url;
+          return;
+        }
+
+        alert(response?.message || "Failed to create OraclePay payment page");
+      } catch (error) {
+        console.error("OraclePay auto deposit error:", error);
+        alert("Failed to create OraclePay payment page. Please try again.");
+      } finally {
+        setSubmitting(false);
+      }
+
+      return;
+    }
 
     console.log("Submitting form with data:", formData);
     console.log("Filtered form fields:", filteredFormFields);
@@ -604,27 +687,6 @@ export default function DepositPage() {
           requestData.walletAddress = formData[walletField.name];
         } else {
           requestData.walletAddress = walletAddress;
-        }
-      }
-
-      if (activeTab === 'auto') {
-        const senderField = filteredFormFields.find(f =>
-          f.name.toLowerCase().includes('sender') ||
-          f.label.toLowerCase().includes('sender') ||
-          f.name.toLowerCase().includes('phone') ||
-          f.name.toLowerCase().includes('number')
-        );
-        if (senderField && formData[senderField.name]) {
-          requestData.senderNumber = formData[senderField.name];
-        }
-
-        const txField = filteredFormFields.find(f =>
-          f.name.toLowerCase().includes('transaction') ||
-          f.label.toLowerCase().includes('transaction') ||
-          f.name.toLowerCase().includes('tx')
-        );
-        if (txField && formData[txField.name]) {
-          requestData.transactionId = formData[txField.name];
         }
       }
 
@@ -799,7 +861,7 @@ export default function DepositPage() {
       </div>
 
       {/* Selected Promotion Banner */}
-      {selectedPromotion && (
+      {activeTab !== "auto" && selectedPromotion && (
         <div className="px-4 mt-2 mb-4">
           <div className="bg-gradient-to-r from-pink-600/20 to-purple-600/20 rounded-xl p-3 border border-pink-500/30 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -836,7 +898,7 @@ export default function DepositPage() {
       )}
 
       {/* Promotions Banner */}
-      {promotions.filter(p => p.isActive).length > 0 && !selectedPromotion && (
+      {activeTab !== "auto" && promotions.filter(p => p.isActive).length > 0 && !selectedPromotion && (
         <div className="px-4 mt-2 mb-4">
           <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-4 border border-purple-500/30">
             <div className="flex items-center justify-between mb-3">
@@ -925,7 +987,7 @@ export default function DepositPage() {
       )} */}
 
       {/* Bonus Field Info */}
-      {bonusField && (
+      {activeTab !== "auto" && bonusField && (
         <div className="px-4 mt-2 mb-4">
           <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-xl p-2 flex items-center gap-2">
             <Star className="w-4 h-4 text-yellow-500 flex-shrink-0" />
@@ -1144,14 +1206,16 @@ export default function DepositPage() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  disabled={submitting || (selectedPromotion && !!amountError) || !!bonusFieldError || filteredFormFields.length === 0}
-                  className="block mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50"
+                  disabled={submitting || filteredFormFields.length === 0}
+                  className="inline-flex mx-auto py-3 px-8 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-base rounded-xl hover:brightness-110 transition shadow-lg disabled:opacity-50 items-center justify-center gap-2"
                 >
-                  {submitting ? 'Processing...' : 'Deposit Now'}
-                  {calculatedBonus && !submitting && (
-                    <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded-full">
-                      +৳{calculatedBonus.toFixed(2)}
-                    </span>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    'Deposit Now'
                   )}
                 </button>
               </div>
@@ -1165,8 +1229,30 @@ export default function DepositPage() {
             <div className="mb-6">
               <div className="bg-green-900/30 border border-green-800/50 rounded-lg p-3 mb-5 text-xs">
                 <p className="text-green-300 font-medium">
-                  গাড়ি পেমেন্ট করতে হলে ২.০% চার্জ লাগবে এবং বিকাশ/নগদ/রকেট থেকে পেমেন্ট করুন
+                  Select an amount and complete the payment through OraclePay. No bonus is applied for auto deposits.
                 </p>
+              </div>
+
+              <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
+                <div className="flex items-center justify-between text-xs text-gray-300 mb-3">
+                  <span>Minimum: ৳{AUTO_DEPOSIT_MIN.toFixed(2)}</span>
+                  <span>Maximum: ৳{autoDepositMax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {AUTO_AMOUNT_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleAutoAmountSelect(preset)}
+                      className={`rounded-xl py-3 text-sm font-bold transition-colors ${String(preset) === (autoDepositAmount || formData[amountFieldName])
+                        ? 'bg-[#f3bf08] text-black'
+                        : 'bg-white/80 text-gray-700 hover:bg-white'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Payment Methods */}

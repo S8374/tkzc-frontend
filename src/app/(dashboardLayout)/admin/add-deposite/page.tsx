@@ -671,14 +671,25 @@ export default function DepositManagement() {
   const handleCreatePromotion = async () => {
     try {
       // Validate required fields
-      if (!promotionForm.bonusName) {
-        alert("Please enter a bonus name");
-        return;
-      }
+      const isAutoTab = activeTab === 'auto';
+      const autoMaxValue = Number(promotionForm.maxBonus || 0);
 
-      if (promotionForm.value <= 0) {
-        alert("Bonus value must be greater than 0");
-        return;
+      // Validate based on tab type
+      if (isAutoTab) {
+        if (autoMaxValue <= 0) {
+          alert("Maximum value must be greater than 0");
+          return;
+        }
+      } else {
+        if (!promotionForm.bonusName) {
+          alert("Please enter a bonus name");
+          return;
+        }
+
+        if (promotionForm.value <= 0) {
+          alert("Bonus value must be greater than 0");
+          return;
+        }
       }
 
       if (promotionForm.maxBonus && promotionForm.maxBonus < 0) {
@@ -701,9 +712,9 @@ export default function DepositManagement() {
       }
 
       const createData: any = {
-        bonusName: promotionForm.bonusName,
-        type: promotionForm.type,
-        value: Number(promotionForm.value),
+        bonusName: isAutoTab ? 'Auto Deposit Maximum' : promotionForm.bonusName,
+        type: isAutoTab ? 'FIXED' : promotionForm.type,
+        value: isAutoTab ? autoMaxValue : Number(promotionForm.value),
         tab: activeTab,
         isActive: promotionForm.isActive
       };
@@ -757,14 +768,25 @@ export default function DepositManagement() {
 
     try {
       // Validate required fields
-      if (!promotionForm.bonusName) {
-        alert("Please enter a bonus name");
-        return;
-      }
+      const isAutoTab = activeTab === 'auto';
+      const autoMaxValue = Number(promotionForm.maxBonus || 0);
 
-      if (promotionForm.value <= 0) {
-        alert("Bonus value must be greater than 0");
-        return;
+      // Validate based on tab type
+      if (isAutoTab) {
+        if (autoMaxValue <= 0) {
+          alert("Maximum value must be greater than 0");
+          return;
+        }
+      } else {
+        if (!promotionForm.bonusName) {
+          alert("Please enter a bonus name");
+          return;
+        }
+
+        if (promotionForm.value <= 0) {
+          alert("Bonus value must be greater than 0");
+          return;
+        }
       }
 
       if (promotionForm.maxBonus && promotionForm.maxBonus < 0) {
@@ -787,9 +809,9 @@ export default function DepositManagement() {
       }
 
       const updateData: any = {
-        bonusName: promotionForm.bonusName,
-        type: promotionForm.type,
-        value: Number(promotionForm.value),
+        bonusName: isAutoTab ? 'Auto Deposit Maximum' : promotionForm.bonusName,
+        type: isAutoTab ? 'FIXED' : promotionForm.type,
+        value: isAutoTab ? autoMaxValue : Number(promotionForm.value),
         isActive: promotionForm.isActive
       };
 
@@ -1390,7 +1412,7 @@ export default function DepositManagement() {
               <div className="flex justify-between items-center mt-4 mb-4">
                 <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                   <Gift className="w-5 h-5 text-pink-500" />
-                  Promotions & Bonuses
+                  {activeTab === 'auto' ? 'Auto Deposit Maximum' : 'Promotions & Bonuses'}
                 </h2>
                 <button
                   onClick={() => {
@@ -1401,7 +1423,7 @@ export default function DepositManagement() {
                   className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Bonus
+                  {activeTab === 'auto' ? 'Add Maximum' : 'Add Bonus'}
                 </button>
               </div>
 
@@ -1455,7 +1477,7 @@ export default function DepositManagement() {
                             )}
                             {promotion.maxBonus && (
                               <p className="text-gray-300">
-                                Max Bonus: <span className="text-green-400">৳{promotion.maxBonus}</span>
+                                {activeTab === 'auto' ? 'Maximum Value:' : 'Max Bonus:'} <span className="text-green-400">৳{promotion.maxBonus}</span>
                               </p>
                             )}
                             {paymentMethod && (
@@ -2285,15 +2307,17 @@ export default function DepositManagement() {
             <div className="sticky top-0 bg-gray-800 pt-6 px-6 pb-4 z-10 border-b border-gray-700 rounded-t-lg">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-bold text-white">
-                  {editingItem ? 'Edit Promotion' : 'Add New Promotion'}
+                  {editingItem ? 'Edit' : 'Set'} {activeTab === 'auto' ? 'Auto Deposit Maximum' : 'Promotion'}
                 </h3>
                 <button onClick={() => setShowPromotionModal(false)} className="text-gray-400 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2">
-                Note: Create payment methods first before linking them to promotions
-              </p>
+              {activeTab !== 'auto' && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Note: Create payment methods first before linking them to promotions
+                </p>
+              )}
             </div>
 
             {/* Scrollable Content */}
@@ -2302,26 +2326,28 @@ export default function DepositManagement() {
                 e.preventDefault();
                 editingItem ? handleUpdatePromotion() : handleCreatePromotion();
               }} className="space-y-4">
-                {/* Bonus Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Bonus Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={promotionForm.bonusName}
-                    onChange={(e) => setPromotionForm({ ...promotionForm, bonusName: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                    placeholder="e.g., Eid Bonus, Welcome Bonus"
-                    required
-                  />
-                </div>
+                {activeTab !== 'auto' && (
+                  <>
+                    {/* Bonus Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Bonus Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={promotionForm.bonusName}
+                        onChange={(e) => setPromotionForm({ ...promotionForm, bonusName: e.target.value })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        placeholder="e.g., Eid Bonus, Welcome Bonus"
+                        required
+                      />
+                    </div>
 
-                {/* Bonus Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Bonus Type <span className="text-red-500">*</span>
-                  </label>
+                    {/* Bonus Type */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Bonus Type <span className="text-red-500">*</span>
+                      </label>
                   <div className="grid grid-cols-2 gap-3">
                     <label
                       className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'PERCENT'
@@ -2406,11 +2432,13 @@ export default function DepositManagement() {
                     />
                   </div>
                 </div>
+                  </>
+                )}
 
                 {/* Max Bonus - NEW */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Maximum Bonus (Optional)
+                    {activeTab === 'auto' ? 'Maximum Value (Required)' : 'Maximum Bonus (Optional)'}
                   </label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -2422,16 +2450,21 @@ export default function DepositManagement() {
                         maxBonus: e.target.value ? parseFloat(e.target.value) : undefined
                       })}
                       className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                      placeholder="e.g., 200"
+                      placeholder={activeTab === 'auto' ? "e.g., 500000" : "e.g., 200"}
                       min="0"
+                      required={activeTab === 'auto'}
                     />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    Maximum bonus amount (cap). Leave empty for no limit.
+                    {activeTab === 'auto' 
+                      ? 'Maximum deposit amount allowed for auto deposits.'
+                      : 'Maximum bonus amount (cap). Leave empty for no limit.'
+                    }
                   </p>
                 </div>
 
                 {/* Payment Method Selection - NEW */}
+                {activeTab !== 'auto' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Link to Payment Method (Optional)
@@ -2463,6 +2496,7 @@ export default function DepositManagement() {
                     If linked, this bonus will only apply to this specific payment method
                   </p>
                 </div>
+                )}
 
                 {/* Icon Upload Section */}
                 <div>
