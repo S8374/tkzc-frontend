@@ -492,6 +492,18 @@ export default function AdminDepositRequests() {
               <span className="text-gray-300">Type:</span>
               <span className="text-white capitalize">{selectedRequest.depositType}</span>
             </div>
+            {selectedRequest.turnoverMultiplier && selectedRequest.turnoverMultiplier > 0 && (
+              <>
+                <div className="flex justify-between border-t border-gray-600 pt-2 mt-2">
+                  <span className="text-gray-300">Turnover Mult:</span>
+                  <span className="text-emerald-400 font-bold">{selectedRequest.turnoverMultiplier}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Required Turnover:</span>
+                  <span className="text-emerald-400 font-bold">৳{selectedRequest.turnoverRequired?.toFixed(2)}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

@@ -1234,9 +1234,8 @@ export default function DepositPage() {
               </div>
 
               <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
-                <div className="flex items-center justify-between text-xs text-gray-300 mb-3">
-                  <span>Minimum: ৳{AUTO_DEPOSIT_MIN.toFixed(2)}</span>
-                  <span>Maximum: ৳{autoDepositMax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <div className="flex items-center justify-center text-xs text-gray-300 mb-3">
+                  <span>Range: ৳{AUTO_DEPOSIT_MIN.toFixed(2)} - ৳{autoDepositMax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {AUTO_AMOUNT_PRESETS.map((preset) => (

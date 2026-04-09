@@ -26,4 +26,8 @@ export const authService = {
     const response = await api.post("/auth/logout", data);
     return response?.data;
   },
+  async getMyStats(): Promise<any> {
+    const response = await api.get("/user/stats");
+    return response?.data;
+  },
 };

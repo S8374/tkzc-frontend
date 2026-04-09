@@ -22,18 +22,27 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.status === "COMPLETED") {
-      console.log("OraclePay payment completed:", {
-        invoice_number: body.invoice_number,
-        amount: body.amount,
-        transaction_id: body.transaction_id,
-        session_code: body.session_code,
-        bank: body.bank,
-      });
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+        const response = await fetch(`${backendUrl}/auto-deposits/callback`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        
+        if (!response.ok) {
+          console.error("Failed to forward webhook to backend", await response.text());
+        }
+      } catch (err) {
+        console.error("Error forwarding webhook to backend", err);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Webhook received",
+      message: "Webhook received and processed",
       invoice_number: body.invoice_number,
     });
   } catch (error) {

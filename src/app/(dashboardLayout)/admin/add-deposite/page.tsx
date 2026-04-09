@@ -1414,17 +1414,19 @@ export default function DepositManagement() {
                   <Gift className="w-5 h-5 text-pink-500" />
                   {activeTab === 'auto' ? 'Auto Deposit Maximum' : 'Promotions & Bonuses'}
                 </h2>
-                <button
-                  onClick={() => {
-                    setEditingItem(null);
-                    resetPromotionForm();
-                    setShowPromotionModal(true);
-                  }}
-                  className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg"
-                >
-                  <Plus className="w-4 h-4" />
-                  {activeTab === 'auto' ? 'Add Maximum' : 'Add Bonus'}
-                </button>
+                {!(activeTab === 'auto' && promotions.length >= 1) && (
+                  <button
+                    onClick={() => {
+                      setEditingItem(null);
+                      resetPromotionForm();
+                      setShowPromotionModal(true);
+                    }}
+                    className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {activeTab === 'auto' ? 'Add Maximum' : 'Add Bonus'}
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2499,6 +2501,7 @@ export default function DepositManagement() {
                 )}
 
                 {/* Icon Upload Section */}
+                {activeTab !== 'auto' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Promotion Icon (Optional)
@@ -2587,8 +2590,10 @@ export default function DepositManagement() {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Date Range */}
+                {activeTab !== 'auto' && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -2613,6 +2618,7 @@ export default function DepositManagement() {
                     />
                   </div>
                 </div>
+                )}
 
                 {/* Active Status */}
                 <div className="flex items-center">

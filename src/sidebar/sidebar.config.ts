@@ -20,6 +20,7 @@ import {
   PackageX,
   SectionIcon,
   Wallet,
+  Award,
 } from "lucide-react";
 
 export const SIDEBAR_CONFIG: SidebarSection[] = [
@@ -51,6 +52,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
           { title: "Deposite Handel", url: "/admin/add-deposite", icon: Settings },
           { title: "Deposite Request", url: "/admin/deposit-request", icon: Settings },
           { title: "Withdraw Request", url: "/admin/withdraw-request", icon: Settings },
+          { title: "Auto-Deposit History", url: "/admin/auto-deposit-history", icon: Settings },
         ],
       },
       {
@@ -58,6 +60,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         icon: User,
         items: [
           { title: "User Handel", url: "/admin/controll-user", icon: Settings },
+          { title: "Referral Control", url: "/admin/referral-control", icon: Award },
         ],
       },
       {

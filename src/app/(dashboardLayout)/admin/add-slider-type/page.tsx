@@ -20,7 +20,10 @@ import {
     Globe,
     FolderOpen,
     Save,
-    RefreshCw
+    RefreshCw,
+    CheckSquare,
+    Square,
+    ShieldCheck
 } from "lucide-react";
 import { oracleService } from "@/services/api/oracel.service";
 
@@ -57,6 +60,7 @@ const CreateSliderTypePage = () => {
         iconUrl: "",
         isActive: true
     });
+    const [selectedProviderCodes, setSelectedProviderCodes] = useState<string[]>([]);
     const [iconPreview, setIconPreview] = useState("");
     const [loading, setLoading] = useState(false);
     const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
@@ -82,26 +86,17 @@ const CreateSliderTypePage = () => {
     const matchedProviders = shouldMatchProviders
         ? providers.filter((provider) => {
             const gameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
-            if (!gameTypes.length) return false;
+            if (!gameTypes.length) return true; // If no specific game types mapped, show all
 
-            const providerTypes = provider.gameType
+            const providerTypes = (provider.gameType || "")
                 .split(",")
                 .map((type) => type.trim().toUpperCase());
 
             return gameTypes.some((type) => providerTypes.includes(type));
         })
-        : [];
-
-    const providerSelectionPool = shouldMatchProviders
-        ? (() => {
-            const gameTypes = sliderTypeToGameTypeMap[selectedSliderType] || [];
-            return gameTypes.length ? matchedProviders : providers;
-        })()
-        : [];
+        : providers;
 
     const sliderTypeOptions = [
-        { id: "home", label: "Home", icon: "🏠" },
-        { id: "hero", label: "Hero", icon: "⭐" },
         { id: "hot", label: "Hot", icon: "🔥" },
         { id: "recent-views", label: "Recent Views", icon: "👁️" },
         { id: "slot-game", label: "Slot Game", icon: "🎰" },
@@ -111,6 +106,8 @@ const CreateSliderTypePage = () => {
         { id: "sport", label: "Sport", icon: "⚽" },
         { id: "table-game", label: "Table Game", icon: "🎯" },
         { id: "promotion", label: "Promotion", icon: "🎯" },
+        { id: "home", label: "Home", icon: "🏠" },
+        { id: "hero", label: "Hero", icon: "⭐" },
     ];
 
     const validateField = (name: string, value: string) => {
@@ -138,6 +135,34 @@ const CreateSliderTypePage = () => {
 
         const error = validateField(name, value);
         setErrors(prev => ({ ...prev, [name]: error }));
+
+        // Auto-select providers based on type
+        if (name === "name" && value) {
+            const gameTypes = sliderTypeToGameTypeMap[value] || [];
+            if (gameTypes.length > 0) {
+                const autoMatched = providers.filter((p) => {
+                    const pTypes = (p.gameType || "").split(",").map(t => t.trim().toUpperCase());
+                    return gameTypes.some(t => pTypes.includes(t));
+                });
+                setSelectedProviderCodes(autoMatched.map(p => p.providerCode));
+            } else {
+                setSelectedProviderCodes([]);
+            }
+        }
+    };
+
+    const toggleProvider = (code: string) => {
+        setSelectedProviderCodes(prev => 
+            prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedProviderCodes.length === matchedProviders.length) {
+            setSelectedProviderCodes([]);
+        } else {
+            setSelectedProviderCodes(matchedProviders.map(p => p.providerCode));
+        }
     };
 
     const handleBlur = (field: string) => {
@@ -194,7 +219,7 @@ const CreateSliderTypePage = () => {
 
         try {
             setLoading(true);
-            const selectedProviders = providerSelectionPool;
+            const selectedProviders = providers.filter(p => selectedProviderCodes.includes(p.providerCode));
 
             const uniqueGameTypes = Array.from(
                 new Set(
@@ -210,8 +235,8 @@ const CreateSliderTypePage = () => {
             const payload: SliderTypeData = {
                 ...formData,
                 gameType: uniqueGameTypes.length ? uniqueGameTypes.join(",") : undefined,
-                providerCode: selectedProviders.length
-                    ? selectedProviders.map((provider) => provider.providerCode).join(",")
+                providerCode: selectedProviderCodes.length
+                    ? selectedProviderCodes.join(",")
                     : undefined,
                 providerName: selectedProviders.length
                     ? selectedProviders.map((provider) => provider.providerName).join(",")
@@ -241,7 +266,7 @@ const CreateSliderTypePage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-6">
-            <div className=" mx-auto">
+            <div className="max-w-4xl mx-auto">
                 {/* Header with breadcrumb */}
                 <div className="mb-8">
                     <Link
@@ -273,7 +298,7 @@ const CreateSliderTypePage = () => {
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Main Form Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden shadow-xl">
                         <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
                             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                                 <Type className="w-5 h-5 text-yellow-500" />
@@ -317,10 +342,66 @@ const CreateSliderTypePage = () => {
                                         {errors.name}
                                     </p>
                                 )}
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Choose one predefined slider type for your sliders
-                                </p>
                             </div>
+
+                            {/* Providers Selection */}
+                            {formData.name && formData.name !== "home" && formData.name !== "hero" ? (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-sm font-medium text-gray-300">
+                                            Select Providers
+                                        </label>
+                                        <button 
+                                            type="button"
+                                            onClick={toggleSelectAll}
+                                            className="text-xs text-yellow-500 hover:text-yellow-400 font-bold uppercase tracking-tight"
+                                        >
+                                            {selectedProviderCodes.length === matchedProviders.length ? "Deselect All" : "Select All Available"}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-4 bg-gray-900/50 rounded-xl border border-gray-700 custom-scrollbar">
+                                        {matchedProviders.length > 0 ? (
+                                            matchedProviders.map((provider) => {
+                                                const isSelected = selectedProviderCodes.includes(provider.providerCode);
+                                                return (
+                                                    <div 
+                                                        key={provider._id}
+                                                        onClick={() => toggleProvider(provider.providerCode)}
+                                                        className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center gap-2 ${
+                                                            isSelected 
+                                                                ? "bg-yellow-500/10 border-yellow-500/50 text-yellow-500" 
+                                                                : "bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-500"
+                                                        }`}
+                                                    >
+                                                        {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                                        <span className="text-xs font-semibold truncate">{provider.providerName}</span>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="col-span-full py-4 text-center text-gray-500 text-sm">
+                                                No providers found for this category
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 italic">
+                                        * Selection pool is filtered based on the selected slider type
+                                    </p>
+                                </div>
+                            ) : formData.name && (
+                                <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl animate-in fade-in duration-300">
+                                    <div className="flex items-center gap-3">
+                                        <ShieldCheck className="w-5 h-5 text-yellow-500" />
+                                        <div>
+                                            <p className="text-sm font-bold text-yellow-500 uppercase tracking-tight">Global Slider Type</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">
+                                                Provider selection is disabled for <span className="text-white font-bold">{formData.name === 'home' ? 'Home' : 'Hero'}</span> types as they are displayed globally across all providers.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Description */}
                             <div className="space-y-2">
@@ -340,7 +421,7 @@ const CreateSliderTypePage = () => {
                     </div>
 
                     {/* Icon Upload Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden shadow-xl">
                         <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
                             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                                 <ImageIcon className="w-5 h-5 text-yellow-500" />
@@ -474,7 +555,7 @@ const CreateSliderTypePage = () => {
                     </div>
 
                     {/* Status Card */}
-                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden shadow-xl">
                         <div className="px-6 py-4 bg-gray-800/50 border-b border-gray-700/50">
                             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                                 <Eye className="w-5 h-5 text-yellow-500" />
@@ -513,7 +594,7 @@ const CreateSliderTypePage = () => {
                         <button
                             type="submit"
                             disabled={loading || !!errors.name}
-                            className="flex-1 py-3 px-6 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                            className="flex-1 py-4 px-6 bg-gradient-to-r from-yellow-500 to-orange-600 text-black rounded-xl font-black uppercase text-xs tracking-[0.2em] hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
                         >
                             {loading ? (
                                 <>
@@ -532,7 +613,7 @@ const CreateSliderTypePage = () => {
                             type="button"
                             onClick={handleCancel}
                             disabled={loading}
-                            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center gap-2"
+                            className="px-8 py-4 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-black uppercase text-xs tracking-[0.2em] transition-all disabled:opacity-50 flex items-center gap-2"
                         >
                             <X className="w-5 h-5" />
                             <span>Cancel</span>
@@ -540,26 +621,22 @@ const CreateSliderTypePage = () => {
                     </div>
                 </form>
 
-                {/* Quick Tips */}
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                        <h3 className="text-sm font-medium text-blue-400 mb-2">💡 Quick Tips</h3>
-                        <ul className="text-xs text-blue-300/70 space-y-1">
-                            <li>• Choose a descriptive name for your slider type</li>
-                            <li>• Add an icon to make it easily identifiable</li>
-                            <li>• You can create multiple sliders under one type</li>
-                        </ul>
-                    </div>
-
-                    <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                        <h3 className="text-sm font-medium text-purple-400 mb-2">📋 Next Steps</h3>
-                        <ul className="text-xs text-purple-300/70 space-y-1">
-                            <li>• After creating, add sliders to this type</li>
-                            <li>• Arrange slider order as needed</li>
-                            <li>• Toggle visibility anytime</li>
-                        </ul>
-                    </div>
-                </div>
+                <style jsx global>{`
+                    .custom-scrollbar::-webkit-scrollbar {
+                        width: 4px;
+                    }
+                    .custom-scrollbar::-webkit-scrollbar-track {
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 10px;
+                    }
+                    .custom-scrollbar::-webkit-scrollbar-thumb {
+                        background: rgba(156, 163, 175, 0.3);
+                        border-radius: 10px;
+                    }
+                    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                        background: rgba(156, 163, 175, 0.5);
+                    }
+                `}</style>
             </div>
         </div>
     );
