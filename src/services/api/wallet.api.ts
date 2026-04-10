@@ -8,14 +8,19 @@ export interface Wallet {
   walletPassword?: string;
   walletAddress?: string;
   protocol?: 'TRC20' | 'ERC20' | 'BEP20';
+  currentTurnover?: number;
+  requiredTurnover?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface UpdateWalletData {
   walletPassword?: string;
+  newWalletPassword?: string;
+  currentWalletPassword?: string;
   walletAddress?: string;
   protocol?: 'TRC20' | 'ERC20' | 'BEP20';
+  clearWalletAddress?: boolean;
 }
 
 export const walletService = {

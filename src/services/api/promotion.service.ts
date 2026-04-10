@@ -9,6 +9,8 @@ export interface Promotion {
   value: number;
   minDeposit?: number;
   maxBonus?: number; // ✅ NEW
+  bonusPercentage?: number;
+  turnoverValue?: number;
   paymentMethodId?: {  // ✅ NEW
     _id: string;
     name: string;
@@ -29,6 +31,8 @@ export interface PromotionData {
   value: number;
   minDeposit?: number;
   maxBonus?: number; // ✅ NEW
+  bonusPercentage?: number;
+  turnoverValue?: number;
   paymentMethodId?: string; // ✅ NEW
   isActive?: boolean;
   startDate?: string;

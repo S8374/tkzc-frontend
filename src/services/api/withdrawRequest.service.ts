@@ -40,7 +40,22 @@ export interface ProcessWithdrawData {
   adminTransactionId?: string;
 }
 
+export interface WithdrawEligibility {
+  hasTurnoverRequirement: boolean;
+  canWithdrawByTurnover: boolean;
+  currentTurnover: number;
+  requiredTurnover: number;
+  remainingTurnover: number;
+  progressPercent: number;
+  message: string;
+}
+
 export const withdrawRequestService = {
+  async getWithdrawEligibility() {
+    const response = await api.get("/withdraw-requests/eligibility");
+    return response?.data;
+  },
+
   async createWithdrawRequest(data: CreateWithdrawRequestData) {
     const response = await api.post("/withdraw-requests", data);
     return response?.data;

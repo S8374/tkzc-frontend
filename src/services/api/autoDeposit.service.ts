@@ -11,6 +11,8 @@ export interface AutoDeposit {
   session_code: string;
   bank: string;
   footprint: string;
+  bonusAmount?: number;
+  turnoverRequired?: number;
   createdAt: string;
 }
 

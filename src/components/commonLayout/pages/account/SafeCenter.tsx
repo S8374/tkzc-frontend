@@ -25,60 +25,63 @@ export default function SafeCenter() {
   const [isSetWithdrawOpen, setIsSetWithdrawOpen] = useState(false);
   const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
   const [isAddNewAddressOpen, setIsAddNewAddressOpen] = useState(false);
+  const [addressMode, setAddressMode] = useState<"add" | "update">("add");
+  const [initialAddress, setInitialAddress] = useState("");
+  const [initialProtocol, setInitialProtocol] = useState<"TRC20" | "ERC20" | "BEP20">("TRC20");
 
   const items = [
-    { 
-      id: "email", 
-      label: "Set email", 
-      icon: Mail, 
-      onClick: () => setIsSetEmailOpen(true) 
+    {
+      id: "email",
+      label: "Set email",
+      icon: Mail,
+      onClick: () => setIsSetEmailOpen(true)
     },
-    { 
-      id: "password", 
-      label: "Modify log in password", 
-      icon: Lock, 
-      onClick: () => setIsModifyPassOpen(true) 
+    {
+      id: "password",
+      label: "Modify log in password",
+      icon: Lock,
+      onClick: () => setIsModifyPassOpen(true)
     },
-    { 
-      id: "withdraw-password", 
-      label: "Set withdraw password", 
-      icon: Shield, 
-      onClick: () => setIsSetWithdrawOpen(true) 
+    {
+      id: "withdraw-password",
+      label: "Set withdraw password",
+      icon: Shield,
+      onClick: () => setIsSetWithdrawOpen(true)
     },
-    { 
-      id: "wallet", 
-      label: "Bind withdraw wallet address", 
-      icon: Wallet, 
-      onClick: () => setIsAddWalletOpen(true) 
+    {
+      id: "wallet",
+      label: "Bind withdraw wallet address",
+      icon: Wallet,
+      onClick: () => setIsAddWalletOpen(true)
     },
   ];
 
   return (
     <div className="min-h-screen bg-[#0F0D2A] pb-20">
-       {/* Header */}
-                      <div className="p-4 flex items-center justify-between border-b border-gray-800">
-                        <BackButton/>
-                        <h2 className="text-xl font-bold text-white">Withdraw</h2>
-                        <p></p>
-                      </div>
       {/* Header */}
+      <div className="p-4 flex items-center justify-between border-b border-gray-800">
+        <BackButton />
+        <h2 className="text-xl font-bold text-white">Safe Center</h2>
+        <p></p>
+      </div>
+      {/* Hero */}
       <div className="relative h-48 overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="absolute inset-0  bg-cover bg-center"
           style={{
             backgroundImage: `radial-gradient(circle at center, #1a1826 0%, #0F0D2A 70%)`,
           }}
         />
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
           <div className="relative w-24 h-24 mb-4">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 blur-xl opacity-50 animate-pulse"></div>
+            <div className="absolute inset-0 rounded-full bg-linear-to-r from-yellow-500 to-orange-500 blur-xl opacity-50 animate-pulse"></div>
             <div className="relative w-full h-full rounded-full bg-black/30 flex items-center justify-center">
               <CheckCircle className="w-10 h-10 text-yellow-400" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">安全中心</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">Account Security</h1>
           <p className="text-gray-300 max-w-xs">
-            Comprehensive protection of your account security
+            Manage password, email, and withdraw wallet protection
           </p>
         </div>
       </div>
@@ -104,33 +107,50 @@ export default function SafeCenter() {
       </div>
 
       {/* Modals */}
-      <SetEmailModal 
-        isOpen={isSetEmailOpen} 
-        onClose={() => setIsSetEmailOpen(false)} 
+      <SetEmailModal
+        isOpen={isSetEmailOpen}
+        onClose={() => setIsSetEmailOpen(false)}
       />
 
-      <ModifyLoginPasswordModal 
-        isOpen={isModifyPassOpen} 
-        onClose={() => setIsModifyPassOpen(false)} 
+      <ModifyLoginPasswordModal
+        isOpen={isModifyPassOpen}
+        onClose={() => setIsModifyPassOpen(false)}
       />
 
-      <SetWithdrawPasswordModal 
-        isOpen={isSetWithdrawOpen} 
-        onClose={() => setIsSetWithdrawOpen(false)} 
+      <SetWithdrawPasswordModal
+        isOpen={isSetWithdrawOpen}
+        onClose={() => setIsSetWithdrawOpen(false)}
       />
 
-      <AddWalletAddressModal 
-        isOpen={isAddWalletOpen} 
+      <AddWalletAddressModal
+        isOpen={isAddWalletOpen}
         onClose={() => setIsAddWalletOpen(false)}
         onAddNew={() => {
+          setAddressMode("add");
+          setInitialAddress("");
+          setInitialProtocol("TRC20");
+          setIsAddWalletOpen(false);
+          setIsAddNewAddressOpen(true);
+        }}
+        onEdit={(walletAddress, protocol) => {
+          setAddressMode("update");
+          setInitialAddress(walletAddress);
+          setInitialProtocol(protocol);
           setIsAddWalletOpen(false);
           setIsAddNewAddressOpen(true);
         }}
       />
 
-      <AddNewAddressModal 
-        isOpen={isAddNewAddressOpen} 
-        onClose={() => setIsAddNewAddressOpen(false)} 
+      <AddNewAddressModal
+        isOpen={isAddNewAddressOpen}
+        onClose={() => setIsAddNewAddressOpen(false)}
+        mode={addressMode}
+        initialAddress={initialAddress}
+        initialProtocol={initialProtocol}
+        onSaved={() => {
+          setIsAddNewAddressOpen(false);
+          setIsAddWalletOpen(true);
+        }}
       />
 
       {/* Bottom padding */}

@@ -51,6 +51,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         items: [
           { title: "Deposite Handel", url: "/admin/add-deposite", icon: Settings },
           { title: "Deposite Request", url: "/admin/deposit-request", icon: Settings },
+          { title: "Crypto Deposit Request", url: "/admin/crypto-deposit-request", icon: Settings },
           { title: "Withdraw Request", url: "/admin/withdraw-request", icon: Settings },
           { title: "Auto-Deposit History", url: "/admin/auto-deposit-history", icon: Settings },
         ],
@@ -69,6 +70,7 @@ export const SIDEBAR_CONFIG: SidebarSection[] = [
         items: [
           { title: "Partner Management", url: "/admin/partners", icon: Settings },
           { title: "Crypto Exchanges ", url: "/admin/crypto-exchanges", icon: Settings },
+          { title: "Software Downloads", url: "/admin/software-downloads", icon: Settings },
           { title: "Support  ", url: "/admin/support", icon: Settings },
         ],
       },

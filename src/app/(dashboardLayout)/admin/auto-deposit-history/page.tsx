@@ -136,6 +136,8 @@ export default function AdminAutoDepositHistory() {
                     <th className="px-4 py-3 text-left text-xs font-semibold">Invoice Number</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">Bank</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">Bonus</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">Turnover</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">Processed At</th>
                   </tr>
@@ -150,6 +152,8 @@ export default function AdminAutoDepositHistory() {
                       <td className="px-4 py-3 text-sm">{request.invoice_number}</td>
                       <td className="px-4 py-3 text-sm capitalize">{request.bank}</td>
                       <td className="px-4 py-3 text-sm font-bold">৳{request.amount}</td>
+                      <td className="px-4 py-3 text-sm text-green-400">৳{request.bonusAmount || 0}</td>
+                      <td className="px-4 py-3 text-sm text-emerald-400">৳{request.turnoverRequired || 0}</td>
                       <td className="px-4 py-3">
                         {request.status.toUpperCase() === "COMPLETED" ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-green-600/20 text-green-400 border border-green-600/30">

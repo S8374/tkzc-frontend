@@ -88,8 +88,12 @@ export const depositRequestService = {
   },
 
   // Admin: Approve request
-  async approveRequest(id: string, adminNote?: string) {
-    const response = await api.patch(`/deposit-requests/admin/${id}/approve`, { adminNote });
+  async approveRequest(id: string, adminNote?: string, bonusAmount?: number, turnoverRequired?: number) {
+    const response = await api.patch(`/deposit-requests/admin/${id}/approve`, { 
+      adminNote, 
+      bonusAmount, 
+      turnoverRequired 
+    });
     return response?.data;
   },
 

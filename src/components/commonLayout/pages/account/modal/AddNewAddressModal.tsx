@@ -11,17 +11,31 @@ import {
   ChevronLeft,
   Wallet,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import { accountService } from "@/services/api/account.service";
 
 interface AddNewAddressModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSaved?: () => void;
+  mode?: "add" | "update";
+  initialAddress?: string;
+  initialProtocol?: "TRC20" | "ERC20" | "BEP20";
 }
 
-export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressModalProps) {
-  const [protocol, setProtocol] = useState("TRC-20");
+export default function AddNewAddressModal({
+  isOpen,
+  onClose,
+  onSaved,
+  mode = "add",
+  initialAddress = "",
+  initialProtocol = "TRC20",
+}: AddNewAddressModalProps) {
+  const [protocol, setProtocol] = useState("TRC20");
   const [address, setAddress] = useState("");
   const [withdrawPassword, setWithdrawPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +54,46 @@ export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressMod
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setProtocol(initialProtocol);
+    setAddress(initialAddress);
+    setWithdrawPassword("");
+  }, [isOpen, initialAddress, initialProtocol]);
+
   if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!address.trim()) {
+      toast.error("Please enter wallet address");
+      return;
+    }
+
+    if (!withdrawPassword.trim()) {
+      toast.error("Please enter withdrawal password");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await accountService.setWalletAddress({
+        walletAddress: address.trim(),
+        protocol: protocol as "TRC20" | "ERC20" | "BEP20",
+        currentWalletPassword: withdrawPassword,
+      });
+      toast.success(mode === "update" ? "Wallet address updated successfully" : "Wallet address saved successfully");
+      setAddress("");
+      setWithdrawPassword("");
+      onSaved?.();
+      onClose();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to save wallet address");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -54,11 +107,13 @@ export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressMod
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-bold text-white">Add new address</h2>
+          <h2 className="text-xl font-bold text-white">
+            {mode === "update" ? "Update wallet address" : "Add new address"}
+          </h2>
         </div>
 
         {/* Form */}
-        <form className="p-5 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {/* Select protocol */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -69,10 +124,9 @@ export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressMod
               onChange={(e) => setProtocol(e.target.value)}
               className="w-full pl-10 pr-10 py-3 bg-[#252334] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 appearance-none"
             >
-              <option>TRC-20</option>
-              <option>ERC-20</option>
-              <option>BEP-20</option>
-              <option>SOL</option>
+              <option value="TRC20">TRC-20</option>
+              <option value="ERC20">ERC-20</option>
+              <option value="BEP20">BEP-20</option>
             </select>
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
@@ -104,7 +158,7 @@ export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressMod
               type={showPassword ? "text" : "password"}
               value={withdrawPassword}
               onChange={(e) => setWithdrawPassword(e.target.value)}
-              placeholder="Please enter Withdrawal Password"
+              placeholder="Enter withdraw password to confirm"
               className="w-full pl-10 pr-10 py-3 bg-[#252334] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
             />
             <button
@@ -118,7 +172,7 @@ export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressMod
 
           {/* Hint */}
           <div className="flex items-start gap-2 p-3 bg-[#252334] rounded-lg">
-            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
             <p className="text-gray-300 text-sm">
               Hint: For the safety of your funds, please make sure that the address you add is the same as the selected protocol.
             </p>
@@ -127,9 +181,10 @@ export default function AddNewAddressModal({ isOpen, onClose }: AddNewAddressMod
           {/* Confirm Button */}
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+            disabled={submitting}
+            className="w-full py-3 bg-linear-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg disabled:opacity-60"
           >
-            Confirm
+            {submitting ? "Saving..." : mode === "update" ? "Update Address" : "Confirm"}
           </button>
         </form>
       </div>

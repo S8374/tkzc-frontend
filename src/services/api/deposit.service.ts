@@ -150,8 +150,8 @@ export const depositService = {
 
   // ========== FORM FIELDS ==========
   async getFormFields(paymentMethodId?: string) {
-    const url = paymentMethodId 
-      ? `/input/${paymentMethodId}` 
+    const url = paymentMethodId
+      ? `/input/${paymentMethodId}`
       : "/input";
     const response = await api.get(url);
     return response?.data;
@@ -210,7 +210,7 @@ export const depositService = {
 
 
   async getInstructionsByPaymentMethod(paymentMethodId: string) {
-  const response = await api.get(`/payment-methods/instruction/payment-method/${paymentMethodId}`);
-  return response?.data;
-}
-};
+    const response = await api.get(`/payment-methods/instruction/payment-method/${paymentMethodId}`);
+    return response?.data;
+  }
+}; 

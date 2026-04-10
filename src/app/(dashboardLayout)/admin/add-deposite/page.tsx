@@ -180,6 +180,8 @@ export default function DepositManagement() {
     value: 0,
     minDeposit: undefined as number | undefined,
     maxBonus: undefined as number | undefined,
+    bonusPercentage: 0,
+    turnoverValue: 0,
     paymentMethodId: undefined as string | undefined,
     iconUrl: '',
     isActive: true,
@@ -673,11 +675,23 @@ export default function DepositManagement() {
       // Validate required fields
       const isAutoTab = activeTab === 'auto';
       const autoMaxValue = Number(promotionForm.maxBonus || 0);
+      const autoBonusPercentage = Number(promotionForm.bonusPercentage || 0);
+      const autoTurnoverValue = Number(promotionForm.turnoverValue || 0);
 
       // Validate based on tab type
       if (isAutoTab) {
         if (autoMaxValue <= 0) {
           alert("Maximum value must be greater than 0");
+          return;
+        }
+
+        if (autoBonusPercentage < 0) {
+          alert("Bonus percentage cannot be negative");
+          return;
+        }
+
+        if (autoTurnoverValue < 0) {
+          alert("Turnover value cannot be negative");
           return;
         }
       } else {
@@ -718,6 +732,11 @@ export default function DepositManagement() {
         tab: activeTab,
         isActive: promotionForm.isActive
       };
+
+      if (isAutoTab) {
+        createData.bonusPercentage = autoBonusPercentage;
+        createData.turnoverValue = autoTurnoverValue;
+      }
 
       if (promotionForm.minDeposit) {
         createData.minDeposit = Number(promotionForm.minDeposit);
@@ -770,11 +789,23 @@ export default function DepositManagement() {
       // Validate required fields
       const isAutoTab = activeTab === 'auto';
       const autoMaxValue = Number(promotionForm.maxBonus || 0);
+      const autoBonusPercentage = Number(promotionForm.bonusPercentage || 0);
+      const autoTurnoverValue = Number(promotionForm.turnoverValue || 0);
 
       // Validate based on tab type
       if (isAutoTab) {
         if (autoMaxValue <= 0) {
           alert("Maximum value must be greater than 0");
+          return;
+        }
+
+        if (autoBonusPercentage < 0) {
+          alert("Bonus percentage cannot be negative");
+          return;
+        }
+
+        if (autoTurnoverValue < 0) {
+          alert("Turnover value cannot be negative");
           return;
         }
       } else {
@@ -814,6 +845,11 @@ export default function DepositManagement() {
         value: isAutoTab ? autoMaxValue : Number(promotionForm.value),
         isActive: promotionForm.isActive
       };
+
+      if (isAutoTab) {
+        updateData.bonusPercentage = autoBonusPercentage;
+        updateData.turnoverValue = autoTurnoverValue;
+      }
 
       if (promotionForm.minDeposit !== undefined) {
         updateData.minDeposit = promotionForm.minDeposit ? Number(promotionForm.minDeposit) : null;
@@ -1012,6 +1048,8 @@ export default function DepositManagement() {
       value: 0,
       minDeposit: undefined,
       maxBonus: undefined,
+      bonusPercentage: 0,
+      turnoverValue: 0,
       paymentMethodId: undefined,
       iconUrl: '',
       isActive: true,
@@ -1096,6 +1134,8 @@ export default function DepositManagement() {
       value: promotion.value,
       minDeposit: promotion.minDeposit,
       maxBonus: promotion.maxBonus,
+      bonusPercentage: promotion.bonusPercentage ?? 0,
+      turnoverValue: promotion.turnoverValue ?? 0,
       paymentMethodId: paymentMethodId,
       iconUrl: promotion.iconUrl || '',
       isActive: promotion.isActive,
@@ -1116,6 +1156,10 @@ export default function DepositManagement() {
   };
 
   const formatBonus = (promotion: Promotion) => {
+    if (promotion.tab === 'auto') {
+      return `${promotion.bonusPercentage ?? 0}% Bonus`;
+    }
+
     if (promotion.type === 'PERCENT') {
       return `${promotion.value}%`;
     } else {
@@ -1481,6 +1525,16 @@ export default function DepositManagement() {
                               <p className="text-gray-300">
                                 {activeTab === 'auto' ? 'Maximum Value:' : 'Max Bonus:'} <span className="text-green-400">৳{promotion.maxBonus}</span>
                               </p>
+                            )}
+                            {activeTab === 'auto' && (
+                              <>
+                                <p className="text-gray-300">
+                                  Bonus Percentage: <span className="text-blue-400">{promotion.bonusPercentage ?? 0}%</span>
+                                </p>
+                                <p className="text-gray-300">
+                                  Turnover Value: <span className="text-yellow-400">{promotion.turnoverValue ?? 0}x</span>
+                                </p>
+                              </>
                             )}
                             {paymentMethod && (
                               <p className="text-gray-300 flex items-center gap-1">
@@ -2350,90 +2404,90 @@ export default function DepositManagement() {
                       <label className="block text-sm font-medium text-gray-300 mb-1">
                         Bonus Type <span className="text-red-500">*</span>
                       </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label
-                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'PERCENT'
-                        ? 'bg-blue-600/20 border-blue-500'
-                        : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
-                        }`}
-                    >
-                      <input
-                        type="radio"
-                        name="type"
-                        value="PERCENT"
-                        checked={promotionForm.type === 'PERCENT'}
-                        onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value as 'PERCENT' })}
-                        className="hidden"
-                      />
-                      <Percent className="w-4 h-4 text-blue-400" />
-                      <span className="text-white">Percentage</span>
-                    </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label
+                          className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'PERCENT'
+                            ? 'bg-blue-600/20 border-blue-500'
+                            : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
+                            }`}
+                        >
+                          <input
+                            type="radio"
+                            name="type"
+                            value="PERCENT"
+                            checked={promotionForm.type === 'PERCENT'}
+                            onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value as 'PERCENT' })}
+                            className="hidden"
+                          />
+                          <Percent className="w-4 h-4 text-blue-400" />
+                          <span className="text-white">Percentage</span>
+                        </label>
 
-                    <label
-                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'FIXED'
-                        ? 'bg-blue-600/20 border-blue-500'
-                        : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
-                        }`}
-                    >
-                      <input
-                        type="radio"
-                        name="type"
-                        value="FIXED"
-                        checked={promotionForm.type === 'FIXED'}
-                        onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value as 'FIXED' })}
-                        className="hidden"
-                      />
-                      <DollarSign className="w-4 h-4 text-green-400" />
-                      <span className="text-white">Fixed Amount</span>
-                    </label>
-                  </div>
-                </div>
+                        <label
+                          className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${promotionForm.type === 'FIXED'
+                            ? 'bg-blue-600/20 border-blue-500'
+                            : 'bg-gray-700 border-gray-600 hover:bg-gray-650'
+                            }`}
+                        >
+                          <input
+                            type="radio"
+                            name="type"
+                            value="FIXED"
+                            checked={promotionForm.type === 'FIXED'}
+                            onChange={(e) => setPromotionForm({ ...promotionForm, type: e.target.value as 'FIXED' })}
+                            className="hidden"
+                          />
+                          <DollarSign className="w-4 h-4 text-green-400" />
+                          <span className="text-white">Fixed Amount</span>
+                        </label>
+                      </div>
+                    </div>
 
-                {/* Value */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    {promotionForm.type === 'PERCENT' ? 'Percentage Value' : 'Fixed Amount (BDT)'}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    {promotionForm.type === 'PERCENT' ? (
-                      <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    ) : (
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    )}
-                    <input
-                      type="number"
-                      value={promotionForm.value}
-                      onChange={(e) => setPromotionForm({ ...promotionForm, value: parseFloat(e.target.value) || 0 })}
-                      className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                      placeholder={promotionForm.type === 'PERCENT' ? "e.g., 10" : "e.g., 50"}
-                      min="0.1"
-                      step={promotionForm.type === 'PERCENT' ? "0.1" : "1"}
-                      required
-                    />
-                  </div>
-                </div>
+                    {/* Value */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        {promotionForm.type === 'PERCENT' ? 'Percentage Value' : 'Fixed Amount (BDT)'}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        {promotionForm.type === 'PERCENT' ? (
+                          <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        ) : (
+                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        )}
+                        <input
+                          type="number"
+                          value={promotionForm.value}
+                          onChange={(e) => setPromotionForm({ ...promotionForm, value: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                          placeholder={promotionForm.type === 'PERCENT' ? "e.g., 10" : "e.g., 50"}
+                          min="0.1"
+                          step={promotionForm.type === 'PERCENT' ? "0.1" : "1"}
+                          required
+                        />
+                      </div>
+                    </div>
 
-                {/* Min Deposit */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Minimum Deposit (Optional)
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="number"
-                      value={promotionForm.minDeposit || ''}
-                      onChange={(e) => setPromotionForm({
-                        ...promotionForm,
-                        minDeposit: e.target.value ? parseFloat(e.target.value) : undefined
-                      })}
-                      className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                      placeholder="e.g., 500"
-                      min="0"
-                    />
-                  </div>
-                </div>
+                    {/* Min Deposit */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Minimum Deposit (Optional)
+                      </label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="number"
+                          value={promotionForm.minDeposit || ''}
+                          onChange={(e) => setPromotionForm({
+                            ...promotionForm,
+                            minDeposit: e.target.value ? parseFloat(e.target.value) : undefined
+                          })}
+                          className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                          placeholder="e.g., 500"
+                          min="0"
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
 
@@ -2458,166 +2512,220 @@ export default function DepositManagement() {
                     />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {activeTab === 'auto' 
+                    {activeTab === 'auto'
                       ? 'Maximum deposit amount allowed for auto deposits.'
                       : 'Maximum bonus amount (cap). Leave empty for no limit.'
                     }
                   </p>
                 </div>
 
-                {/* Payment Method Selection - NEW */}
-                {activeTab !== 'auto' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Link to Payment Method (Optional)
-                  </label>
-                  {paymentMethods.length > 0 ? (
-                    <select
-                      value={promotionForm.paymentMethodId || ''}
-                      onChange={(e) => setPromotionForm({
-                        ...promotionForm,
-                        paymentMethodId: e.target.value || undefined
-                      })}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                    >
-                      <option value="">All Payment Methods (Global)</option>
-                      {paymentMethods.map((method) => (
-                        <option key={method._id} value={method._id}>
-                          {method.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="p-3 bg-yellow-600/20 border border-yellow-600/30 rounded-lg">
-                      <p className="text-xs text-yellow-400">
-                        No payment methods available. Create a payment method first before linking.
+                {activeTab === 'auto' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Bonus Percentage (Required)
+                      </label>
+                      <div className="relative">
+                        <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="number"
+                          value={promotionForm.bonusPercentage}
+                          onChange={(e) => setPromotionForm({
+                            ...promotionForm,
+                            bonusPercentage: Math.max(0, parseFloat(e.target.value) || 0)
+                          })}
+                          className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                          placeholder="e.g., 5"
+                          min="0"
+                          step="0.1"
+                          required
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Bonus applied for auto deposits in percentage.
                       </p>
                     </div>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    If linked, this bonus will only apply to this specific payment method
-                  </p>
-                </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Turnover Value (Required)
+                      </label>
+                      <div className="relative">
+                        <Type className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="number"
+                          value={promotionForm.turnoverValue}
+                          onChange={(e) => setPromotionForm({
+                            ...promotionForm,
+                            turnoverValue: Math.max(0, parseFloat(e.target.value) || 0)
+                          })}
+                          className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                          placeholder="e.g., 3"
+                          min="0"
+                          step="0.1"
+                          required
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Multiplier used to calculate required turnover.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Payment Method Selection - NEW */}
+                {activeTab !== 'auto' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Link to Payment Method (Optional)
+                    </label>
+                    {paymentMethods.length > 0 ? (
+                      <select
+                        value={promotionForm.paymentMethodId || ''}
+                        onChange={(e) => setPromotionForm({
+                          ...promotionForm,
+                          paymentMethodId: e.target.value || undefined
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      >
+                        <option value="">All Payment Methods (Global)</option>
+                        {paymentMethods.map((method) => (
+                          <option key={method._id} value={method._id}>
+                            {method.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="p-3 bg-yellow-600/20 border border-yellow-600/30 rounded-lg">
+                        <p className="text-xs text-yellow-400">
+                          No payment methods available. Create a payment method first before linking.
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      If linked, this bonus will only apply to this specific payment method
+                    </p>
+                  </div>
                 )}
 
                 {/* Icon Upload Section */}
                 {activeTab !== 'auto' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Promotion Icon (Optional)
-                  </label>
-                  <div className="space-y-3">
-                    {/* Upload Area */}
-                    <div className="relative">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePromoIconUpload}
-                        className="hidden"
-                        id="promotion-icon-upload"
-                        disabled={uploadingPromoIcon}
-                      />
-                      <label
-                        htmlFor="promotion-icon-upload"
-                        className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${promoIconUploadStatus === 'success'
-                          ? 'border-green-500 bg-green-500/10'
-                          : promoIconUploadStatus === 'error'
-                            ? 'border-red-500 bg-red-500/10'
-                            : 'border-gray-600 hover:border-pink-500 bg-gray-700/50'
-                          }`}
-                      >
-                        <div className="text-center">
-                          {uploadingPromoIcon ? (
-                            <>
-                              <Loader2 className="w-8 h-8 mx-auto mb-2 text-pink-400 animate-spin" />
-                              <p className="text-sm text-gray-300">Uploading...</p>
-                            </>
-                          ) : promoIconUploadStatus === 'success' ? (
-                            <>
-                              <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
-                              <p className="text-sm text-green-400">Upload Successful!</p>
-                            </>
-                          ) : promoIconUploadStatus === 'error' ? (
-                            <>
-                              <X className="w-8 h-8 mx-auto mb-2 text-red-500" />
-                              <p className="text-sm text-red-400">Upload Failed. Try again.</p>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                              <p className="text-sm text-gray-300">Click to upload icon</p>
-                              <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
-                            </>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-
-                    {/* Preview or URL Input */}
-                    {promotionForm.iconUrl && (
-                      <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
-                        <img
-                          src={promotionForm.iconUrl}
-                          alt="Icon preview"
-                          className="w-12 h-12 rounded-lg object-cover"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Promotion Icon (Optional)
+                    </label>
+                    <div className="space-y-3">
+                      {/* Upload Area */}
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePromoIconUpload}
+                          className="hidden"
+                          id="promotion-icon-upload"
+                          disabled={uploadingPromoIcon}
                         />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-400 truncate">{promotionForm.iconUrl}</p>
-                          <button
-                            type="button"
-                            onClick={() => setPromotionForm({ ...promotionForm, iconUrl: '' })}
-                            className="text-xs text-red-400 hover:text-red-300 mt-1"
-                          >
-                            Remove
-                          </button>
-                        </div>
+                        <label
+                          htmlFor="promotion-icon-upload"
+                          className={`flex items-center justify-center w-full rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors ${promoIconUploadStatus === 'success'
+                            ? 'border-green-500 bg-green-500/10'
+                            : promoIconUploadStatus === 'error'
+                              ? 'border-red-500 bg-red-500/10'
+                              : 'border-gray-600 hover:border-pink-500 bg-gray-700/50'
+                            }`}
+                        >
+                          <div className="text-center">
+                            {uploadingPromoIcon ? (
+                              <>
+                                <Loader2 className="w-8 h-8 mx-auto mb-2 text-pink-400 animate-spin" />
+                                <p className="text-sm text-gray-300">Uploading...</p>
+                              </>
+                            ) : promoIconUploadStatus === 'success' ? (
+                              <>
+                                <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                                <p className="text-sm text-green-400">Upload Successful!</p>
+                              </>
+                            ) : promoIconUploadStatus === 'error' ? (
+                              <>
+                                <X className="w-8 h-8 mx-auto mb-2 text-red-500" />
+                                <p className="text-sm text-red-400">Upload Failed. Try again.</p>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                                <p className="text-sm text-gray-300">Click to upload icon</p>
+                                <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                              </>
+                            )}
+                          </div>
+                        </label>
                       </div>
-                    )}
 
-                    {/* Manual URL Input */}
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1">
-                        <Link2 className="w-3 h-3" />
-                        Or enter icon URL manually
-                      </label>
-                      <input
-                        type="url"
-                        value={promotionForm.iconUrl}
-                        onChange={(e) => setPromotionForm({ ...promotionForm, iconUrl: e.target.value })}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                        placeholder="https://example.com/icon.png"
-                      />
+                      {/* Preview or URL Input */}
+                      {promotionForm.iconUrl && (
+                        <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
+                          <img
+                            src={promotionForm.iconUrl}
+                            alt="Icon preview"
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-400 truncate">{promotionForm.iconUrl}</p>
+                            <button
+                              type="button"
+                              onClick={() => setPromotionForm({ ...promotionForm, iconUrl: '' })}
+                              className="text-xs text-red-400 hover:text-red-300 mt-1"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Manual URL Input */}
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1 flex items-center gap-1">
+                          <Link2 className="w-3 h-3" />
+                          Or enter icon URL manually
+                        </label>
+                        <input
+                          type="url"
+                          value={promotionForm.iconUrl}
+                          onChange={(e) => setPromotionForm({ ...promotionForm, iconUrl: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                          placeholder="https://example.com/icon.png"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
                 )}
 
                 {/* Date Range */}
                 {activeTab !== 'auto' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={promotionForm.startDate}
-                      onChange={(e) => setPromotionForm({ ...promotionForm, startDate: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={promotionForm.startDate}
+                        onChange={(e) => setPromotionForm({ ...promotionForm, startDate: e.target.value })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={promotionForm.endDate}
+                        onChange={(e) => setPromotionForm({ ...promotionForm, endDate: e.target.value })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={promotionForm.endDate}
-                      onChange={(e) => setPromotionForm({ ...promotionForm, endDate: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                    />
-                  </div>
-                </div>
                 )}
 
                 {/* Active Status */}

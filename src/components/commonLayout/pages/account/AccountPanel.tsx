@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
 "use client";
+import { useEffect, useMemo, useState } from "react";
 import { authService } from "@/services/api/auth.services";
+import { walletService } from "@/services/api/wallet.api";
+import { useAuth } from "@/context/AuthContext";
 import {
   Wallet,
   ArrowDownToLine,
@@ -24,6 +27,50 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 export default function ProfileWallet() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const response = await walletService.getMyWallet();
+        const apiBalance = Number(response?.data?.balance || 0);
+        setWalletBalance(Number.isFinite(apiBalance) ? apiBalance : 0);
+      } catch {
+        const fallbackBalance = Number((user as any)?.wallet?.balance || 0);
+        setWalletBalance(Number.isFinite(fallbackBalance) ? fallbackBalance : 0);
+      }
+    };
+
+    fetchWallet();
+  }, [user]);
+
+  const userName = useMemo(() => {
+    if (user?.name && user.name.trim()) return user.name;
+    if (user?.email) return user.email.split("@")[0];
+    return "Guest User";
+  }, [user]);
+
+  const userIdValue = (user as any)?.id || (user as any)?._id || "";
+  const userIdText = userIdValue || "N/A";
+  const referralLink = userIdValue
+    ? `https://t.me/sky8app_bot?start=${userIdValue}`
+    : "-";
+
+  const handleCopyReferral = async () => {
+    if (!userIdValue) {
+      toast.error("User ID not available");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      toast.success("Referral link copied");
+    } catch {
+      toast.error("Failed to copy referral link");
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await authService.logout(undefined);
@@ -50,9 +97,9 @@ export default function ProfileWallet() {
               alt="avatar"
             />
             <div>
-              <p className="font-semibold text-xl">roni123</p>
+              <p className="font-semibold text-xl">{userName}</p>
               <p className="text-xl text-gray-300 flex items-center gap-1">
-                ID: 72059
+                ID: {userIdText}
               </p>
             </div>
           </div>
@@ -86,7 +133,7 @@ export default function ProfileWallet() {
               <Coins className="text-green-400" />
               <span className="font-semibold">Balance</span>
             </div>
-            <span className="text-yellow-400 font-bold">0.00</span>
+            <span className="text-yellow-400 font-bold">{walletBalance.toFixed(2)}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -125,10 +172,13 @@ export default function ProfileWallet() {
               <div className="flex items-center gap-2 mt-2">
                 <input
                   readOnly
-                  value="https://t.me/sky8app_bot?start=72059"
+                  value={referralLink}
                   className="flex-1 bg-gray-600 text-xs p-2 rounded-md"
                 />
-                <button className="bg-yellow-400 text-black px-3 py-1 rounded-md text-xs font-semibold">
+                <button
+                  onClick={handleCopyReferral}
+                  className="bg-yellow-400 text-black px-3 py-1 rounded-md text-xs font-semibold"
+                >
                   copy
                 </button>
               </div>

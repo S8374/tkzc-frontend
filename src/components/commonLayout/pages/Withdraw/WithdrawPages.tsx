@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { depositService, PaymentMethod } from "@/services/api/deposit.service";
 import {
+  WithdrawEligibility,
   WithdrawRequest,
   WithdrawStatus,
   withdrawRequestService,
@@ -57,7 +58,9 @@ const WithdrawPages = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<WithdrawRequest | null>(null);
-  const [wallet, setWallet] = useState<any>(null);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [withdrawEligibility, setWithdrawEligibility] = useState<WithdrawEligibility | null>(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(true);
 
   const parseListPayload = (payload: any) => {
     const body = payload?.data ?? payload;
@@ -113,9 +116,24 @@ const WithdrawPages = () => {
     }
   };
 
+  const fetchWithdrawEligibility = async () => {
+    try {
+      setEligibilityLoading(true);
+      const response = await withdrawRequestService.getWithdrawEligibility();
+      if (response?.success) {
+        setWithdrawEligibility(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch withdraw eligibility:", error);
+    } finally {
+      setEligibilityLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchMyRequests();
     fetchWallet();
+    fetchWithdrawEligibility();
   }, [statusFilter]);
 
   useEffect(() => {
@@ -149,6 +167,12 @@ const WithdrawPages = () => {
     return "bg-yellow-600/20 text-yellow-400 border-yellow-600/30";
   };
 
+  const currentTurnover = withdrawEligibility?.currentTurnover ?? (wallet?.currentTurnover || 0);
+  const requiredTurnover = withdrawEligibility?.requiredTurnover ?? (wallet?.requiredTurnover || 0);
+  const canWithdrawByTurnover = currentTurnover >= requiredTurnover;
+  const remainingTurnover = Math.max(requiredTurnover - currentTurnover, 0);
+  const canSubmitWithdraw = !submitting && paymentMethods.length > 0 && !eligibilityLoading && canWithdrawByTurnover;
+
   const handleSubmit = async () => {
     const amount = Number(withdrawAmount);
     if (!paymentMethod.trim()) {
@@ -163,6 +187,14 @@ const WithdrawPages = () => {
       alert("Please enter a valid withdraw amount");
       return;
     }
+    if (!canWithdrawByTurnover) {
+      alert(
+        `Withdrawal is locked. You must play minimum turnover before withdrawing. Remaining turnover: ৳${remainingTurnover.toFixed(
+          2
+        )}`
+      );
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -175,11 +207,14 @@ const WithdrawPages = () => {
       if (response?.success) {
         setWithdrawAmount("");
         fetchMyRequests();
+        fetchWallet();
+        fetchWithdrawEligibility();
         alert("Withdraw request submitted successfully");
       }
     } catch (error) {
       console.error("Withdraw create failed:", error);
-      alert("Failed to submit withdraw request");
+      const message = (error as any)?.response?.data?.message || "Failed to submit withdraw request";
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -205,7 +240,11 @@ const WithdrawPages = () => {
             <BackButton />
             <h2 className="text-xl font-bold text-white">Withdraw</h2>
             <button
-              onClick={fetchMyRequests}
+              onClick={() => {
+                fetchMyRequests();
+                fetchWallet();
+                fetchWithdrawEligibility();
+              }}
               className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-white hover:bg-black/40"
             >
               <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
@@ -235,17 +274,17 @@ const WithdrawPages = () => {
 
           {/* Turnover Progress */}
           {wallet && (
-            <div className="mx-4 mt-6 p-4 bg-gradient-to-br from-indigo-900/40 to-black/40 border border-indigo-500/20 rounded-2xl">
+            <div className="mx-4 mt-6 p-4 bg-linear-to-br from-indigo-900/40 to-black/40 border border-indigo-500/20 rounded-2xl">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="w-4 h-4 text-indigo-400" />
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">Turnover Requirement</h3>
                 </div>
-                <div className={`px-2 py-1 rounded-full text-[10px] font-black flex items-center gap-1 ${(wallet.currentTurnover || 0) >= (wallet.requiredTurnover || 0)
+                <div className={`px-2 py-1 rounded-full text-[10px] font-black flex items-center gap-1 ${canWithdrawByTurnover
                     ? "bg-green-500/20 text-green-400 border border-green-500/30"
                     : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
                   }`}>
-                  {(wallet.currentTurnover || 0) >= (wallet.requiredTurnover || 0) ? (
+                  {canWithdrawByTurnover ? (
                     <><Check className="w-3 h-3" /> COMPLETED</>
                   ) : (
                     <><Lock className="w-3 h-3 text-yellow-500" /> LOCKED</>
@@ -257,23 +296,28 @@ const WithdrawPages = () => {
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-gray-400">Total Progress</span>
                   <span className="text-white font-bold">
-                    ৳{(wallet.currentTurnover || 0).toFixed(2)} / ৳{(wallet.requiredTurnover || 0).toFixed(2)}
+                    ৳{currentTurnover.toFixed(2)} / ৳{requiredTurnover.toFixed(2)}
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700 shadow-inner">
                   <div
-                    className={`h-full ring-1 ring-white/10 shadow-lg rounded-full transition-all duration-1000 ${(wallet.currentTurnover || 0) >= (wallet.requiredTurnover || 0)
-                        ? "bg-gradient-to-r from-green-600 to-emerald-400"
-                        : "bg-gradient-to-r from-indigo-600 to-blue-400"
+                    className={`h-full ring-1 ring-white/10 shadow-lg rounded-full transition-all duration-1000 ${canWithdrawByTurnover
+                        ? "bg-linear-to-r from-green-600 to-emerald-400"
+                        : "bg-linear-to-r from-indigo-600 to-blue-400"
                       }`}
                     style={{
-                      width: `${Math.min(100, ((wallet.currentTurnover || 0) / (wallet.requiredTurnover || 0 || 1)) * 100)}%`
+                      width: `${Math.min(100, (currentTurnover / (requiredTurnover || 1)) * 100)}%`
                     }}
                   />
                 </div>
-                {(wallet.currentTurnover || 0) < (wallet.requiredTurnover || 0) && (
+                {!canWithdrawByTurnover && (
                   <p className="text-[10px] text-gray-400 italic text-center mt-2">
-                    * You need to reach 100% turnover to unlock withdrawals.
+                    * You must play minimum game turnover to unlock withdrawals.
+                  </p>
+                )}
+                {!canWithdrawByTurnover && (
+                  <p className="text-[11px] text-yellow-300 text-center mt-1 font-semibold">
+                    Remaining turnover to unlock withdraw: ৳{remainingTurnover.toFixed(2)}
                   </p>
                 )}
               </div>
@@ -298,7 +342,7 @@ const WithdrawPages = () => {
                       {method.icon ? (
                         <img src={method.icon} alt={method.name} className="w-full h-full object-contain" />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-400 flex items-center justify-center text-gray-800 font-bold text-xs">
+                        <div className="w-full h-full bg-linear-to-br from-gray-200 to-gray-400 flex items-center justify-center text-gray-800 font-bold text-xs">
                           {method.name.slice(0, 2).toUpperCase()}
                         </div>
                       )}
@@ -346,10 +390,15 @@ const WithdrawPages = () => {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitting || paymentMethods.length === 0}
+              disabled={!canSubmitWithdraw}
               className="w-full py-3 bg-linear-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg disabled:opacity-50"
+              title={!canWithdrawByTurnover ? "Complete turnover requirement first" : ""}
             >
-              {submitting ? "Submitting..." : "Withdraw Money"}
+              {submitting
+                ? "Submitting..."
+                : canWithdrawByTurnover
+                  ? "Withdraw Money"
+                  : "Complete Turnover To Withdraw"}
             </button>
 
             <div className="pt-2 border-t border-gray-800">

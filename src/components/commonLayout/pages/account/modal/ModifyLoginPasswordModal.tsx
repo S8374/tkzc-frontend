@@ -8,6 +8,8 @@ import {
   EyeOff,
   ChevronLeft,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import { accountService } from "@/services/api/account.service";
 
 interface ModifyLoginPasswordModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ export default function ModifyLoginPasswordModal({ isOpen, onClose }: ModifyLogi
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +44,37 @@ export default function ModifyLoginPasswordModal({ isOpen, onClose }: ModifyLogi
 
   if (!isOpen) return null;
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      toast.error("Please fill in all password fields");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("New password and confirm password do not match");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await accountService.changeLoginPassword({
+        currentPassword: oldPassword,
+        newPassword,
+      });
+      toast.success("Login password changed successfully");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      onClose();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to change login password");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div ref={modalRef} className="w-full max-w-md rounded-t-2xl overflow-hidden bg-[#1E1D2A] border-t-4 border-gray-800">
@@ -57,7 +91,7 @@ export default function ModifyLoginPasswordModal({ isOpen, onClose }: ModifyLogi
         </div>
 
         {/* Form */}
-        <form className="p-5 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {/* Old Password */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -124,9 +158,10 @@ export default function ModifyLoginPasswordModal({ isOpen, onClose }: ModifyLogi
           {/* Commit Button */}
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+            disabled={submitting}
+            className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg disabled:opacity-60"
           >
-            Commit
+            {submitting ? "Saving..." : "Commit"}
           </button>
 
           {/* Forget password link */}

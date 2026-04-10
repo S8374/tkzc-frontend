@@ -93,6 +93,12 @@ interface ExtendedPromotion extends Promotion {
 const AUTO_AMOUNT_PRESETS = [200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
 const AUTO_DEPOSIT_MIN = 5;
 const DEFAULT_AUTO_DEPOSIT_MAX = 500000;
+const CRYPTO_USD_PRESETS = [10, 20, 50, 100, 200, 500];
+const CRYPTO_RATES: Record<'BDT' | 'CNY' | 'VND', number> = {
+  BDT: 122,
+  CNY: 7.2,
+  VND: 25500,
+};
 
 export default function DepositPage() {
   const router = useRouter();
@@ -119,6 +125,9 @@ export default function DepositPage() {
   const [tittle, setTittle] = useState<Tittle | null>(null);
   const [autoDepositAmount, setAutoDepositAmount] = useState<string>("");
   const [autoDepositMax, setAutoDepositMax] = useState<number>(DEFAULT_AUTO_DEPOSIT_MAX);
+  const [cryptoUsdAmount, setCryptoUsdAmount] = useState<string>("");
+  const [cryptoDisplayCurrency, setCryptoDisplayCurrency] = useState<'BDT' | 'CNY' | 'VND'>('BDT');
+  const [cryptoProofUrl, setCryptoProofUrl] = useState<string>("");
 
   // Form state - will store all form field values dynamically
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -154,6 +163,9 @@ export default function DepositPage() {
     setBonusField(null);
     setTittle(null);
     setAutoDepositAmount("");
+    setCryptoUsdAmount("");
+    setCryptoDisplayCurrency('BDT');
+    setCryptoProofUrl("");
     setFormData({});
     setFilteredFormFields([]);
     setFilteredInstructions([]);
@@ -166,7 +178,7 @@ export default function DepositPage() {
         // Show instructions that are either:
         // 1. Linked to this payment method
         // 2. Not linked to any payment method
-        const filtered = instructions.filter(instruction => 
+        const filtered = instructions.filter(instruction =>
           !instruction.paymentMethodId || instruction.paymentMethodId === selectedMethod._id
         );
         setFilteredInstructions(filtered.sort((a, b) => a.step - b.step));
@@ -181,16 +193,16 @@ export default function DepositPage() {
   useEffect(() => {
     if (allFormFields.length > 0) {
       let fieldsToShow = [];
-      
+
       if (selectedMethod) {
         // Show fields that are either:
         // 1. Linked to this payment method
         // 2. Not linked to any payment method
-        fieldsToShow = allFormFields.filter(field => 
+        fieldsToShow = allFormFields.filter(field =>
           (!field.paymentMethodId || field.paymentMethodId === selectedMethod._id) &&
           (activeTab !== "auto" || !field.isBonusField)
         );
-        
+
         console.log(`Showing fields for ${selectedMethod.name}:`, fieldsToShow);
       } else {
         // Show ALL fields when no method selected
@@ -199,9 +211,9 @@ export default function DepositPage() {
           : allFormFields;
         console.log("No method selected, showing all fields:", fieldsToShow);
       }
-      
+
       setFilteredFormFields(fieldsToShow);
-      
+
       // Initialize form data with empty strings or static values
       const initialData: Record<string, string> = {};
       fieldsToShow.forEach((field) => {
@@ -230,6 +242,21 @@ export default function DepositPage() {
     const configuredMax = promotions.find((promotion) => promotion.isActive && typeof promotion.maxBonus === 'number' && promotion.maxBonus > 0)?.maxBonus;
     setAutoDepositMax(configuredMax || DEFAULT_AUTO_DEPOSIT_MAX);
   }, [activeTab, promotions]);
+
+  const activeAutoPromotion = activeTab === "auto"
+    ? promotions.find((promotion) => promotion.isActive)
+    : null;
+  const autoBonusPercentage = Number(activeAutoPromotion?.bonusPercentage || 0);
+  const autoTurnoverValue = Number(activeAutoPromotion?.turnoverValue || 0);
+  const cryptoScreenshotField = activeTab === 'crypto'
+    ? filteredFormFields.find((field) => field.type === 'screenshot')
+    : null;
+  const cryptoScreenshotValue = cryptoScreenshotField ? formData[cryptoScreenshotField.name] : '';
+  const cryptoProofValue = cryptoScreenshotValue || formData.cryptoProof || formData.__cryptoProof || cryptoProofUrl;
+  const cryptoUsdNumeric = Number(cryptoUsdAmount || 0);
+  const cryptoDisplayRate = CRYPTO_RATES[cryptoDisplayCurrency];
+  const cryptoDisplayConverted = cryptoUsdNumeric > 0 ? Number((cryptoUsdNumeric * cryptoDisplayRate).toFixed(2)) : 0;
+  const cryptoBdtEquivalent = cryptoUsdNumeric > 0 ? Number((cryptoUsdNumeric * CRYPTO_RATES.BDT).toFixed(2)) : 0;
 
   // Find the amount field and bonus field whenever filtered form fields change
   useEffect(() => {
@@ -439,10 +466,10 @@ export default function DepositPage() {
 
     // Check if promotion is linked to a specific payment method
     if (promo.paymentMethodId && selectedMethod) {
-      const promoMethodId = typeof promo.paymentMethodId === 'object' 
-        ? promo.paymentMethodId._id 
+      const promoMethodId = typeof promo.paymentMethodId === 'object'
+        ? promo.paymentMethodId._id
         : promo.paymentMethodId;
-      
+
       if (promoMethodId !== selectedMethod._id) {
         alert(`This promotion is only available for a different payment method`);
         return;
@@ -505,9 +532,19 @@ export default function DepositPage() {
     const nextAmount = String(value);
     setAutoDepositAmount(nextAmount);
 
-    if (amountFieldName) {
-      handleInputChange(amountFieldName, nextAmount);
+    const targetAmountFieldName =
+      amountFieldName || filteredFormFields.find((field) => field.type === "number")?.name;
+
+    if (targetAmountFieldName) {
+      const bonusPercentage = Number(activeAutoPromotion?.bonusPercentage || 0);
+      const bonusAmount = bonusPercentage > 0 ? (value * bonusPercentage) / 100 : 0;
+      const totalWithBonus = value + bonusAmount;
+      handleInputChange(targetAmountFieldName, totalWithBonus.toFixed(2));
     }
+  };
+
+  const handleCryptoUsdSelect = (value: number) => {
+    setCryptoUsdAmount(String(value));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
@@ -520,11 +557,45 @@ export default function DepositPage() {
     setTimeout(() => {
       const mockUrl = `https://i.ibb.co/example/uploaded-${Date.now()}.jpg`;
       setUploadedFileUrl(mockUrl);
+      if (fieldName === '__cryptoProof') {
+        setCryptoProofUrl(mockUrl);
+      }
       setUploadStatus('success');
       handleInputChange(fieldName, mockUrl);
       setTimeout(() => setUploadStatus('idle'), 3000);
     }, 2000);
   };
+
+  useEffect(() => {
+    if (activeTab !== 'crypto') return;
+
+    const targetAmountFieldName =
+      amountFieldName || filteredFormFields.find((field) => field.type === 'number')?.name;
+
+    if (!targetAmountFieldName) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      [targetAmountFieldName]: cryptoBdtEquivalent > 0 ? cryptoBdtEquivalent.toFixed(2) : '',
+      cryptoUsdAmount: cryptoUsdAmount || '',
+      cryptoDisplayCurrency,
+      cryptoDisplayRate: String(cryptoDisplayRate),
+      cryptoDisplayConverted: cryptoDisplayConverted > 0 ? cryptoDisplayConverted.toFixed(2) : '',
+      cryptoBdtEquivalent: cryptoBdtEquivalent > 0 ? cryptoBdtEquivalent.toFixed(2) : '',
+      cryptoProof: cryptoProofValue || '',
+    }));
+  }, [
+    activeTab,
+    amountFieldName,
+    filteredFormFields,
+    cryptoUsdAmount,
+    cryptoDisplayCurrency,
+    cryptoDisplayRate,
+    cryptoDisplayConverted,
+    cryptoBdtEquivalent,
+    cryptoProofValue,
+    cryptoProofUrl,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -544,22 +615,68 @@ export default function DepositPage() {
           return;
         }
 
-        const invoiceNumber = `API-TEST-${Date.now()}`;
+        const methodForAuto = selectedMethod || paymentMethods[0] || null;
+        const methodIdForInvoice = methodForAuto?._id || "unknown";
+        const userIdForInvoice = user?.id || "guest";
+
+        const bonusPercentage = Number(activeAutoPromotion?.bonusPercentage || 0);
+        const turnoverMultiplier = Number(activeAutoPromotion?.turnoverValue || 0);
+
+        const bonusAmount = bonusPercentage > 0
+          ? Number(((amount * bonusPercentage) / 100).toFixed(2))
+          : 0;
+        const totalWithBonus = Number((amount + bonusAmount).toFixed(2));
+        const turnoverRequired = turnoverMultiplier > 0
+          ? Number((totalWithBonus * turnoverMultiplier).toFixed(2))
+          : 0;
+
+        const baseAmountCents = Math.round(amount * 100);
+        const bonusCents = Math.round(bonusAmount * 100);
+        const totalWithBonusCents = Math.round(totalWithBonus * 100);
+        const turnoverRequiredCents = Math.round(turnoverRequired * 100);
+
+        const proceedToPayment = confirm(
+          `Payment Amount: ৳${amount.toFixed(2)}\n` +
+          `Bonus: ৳${bonusAmount.toFixed(2)}\n` +
+          `Total With Bonus: ৳${totalWithBonus.toFixed(2)}\n` +
+          `Required Turnover: ৳${turnoverRequired.toFixed(2)}\n\n` +
+          `Press OK to continue to payment page.`
+        );
+
+        if (!proceedToPayment) {
+          return;
+        }
+
+        const invoiceNumber = `AUTO_${userIdForInvoice}_${methodIdForInvoice}_${baseAmountCents}_${bonusCents}_${totalWithBonusCents}_${turnoverRequiredCents}_${turnoverMultiplier}_${bonusPercentage}_${Date.now()}`;
         const userIdentityAddress = user?.email || user?.id || "customer@example.com";
         const callbackUrl = `${window.location.origin}/api/payment/oraclepay-callback`;
         const successRedirectUrl = `${window.location.origin}/deposit?status=success`;
 
-        const response = await oraclePayService.generatePaymentPage({
-          payment_amount: amount,
+        const primaryPayableAmount = Number(totalWithBonus.toFixed(2));
+        const fallbackPayableAmount = Math.round(totalWithBonus);
+
+        const oraclePayload = {
+          payment_amount: primaryPayableAmount,
           user_identity_address: userIdentityAddress,
           callback_url: callbackUrl,
           success_redirect_url: successRedirectUrl,
           invoice_number: invoiceNumber,
           checkout_items: {
-            type: "Auto Deposit",
-            initiator: "Merchant Dashboard",
+            type: `AutoDeposit Bonus ${bonusAmount.toFixed(2)}`,
+            initiator: `Pay ${amount.toFixed(2)} Bonus ${bonusAmount.toFixed(2)} Total ${totalWithBonus.toFixed(2)} Turnover ${turnoverRequired.toFixed(2)}`,
           },
-        });
+        };
+
+        let response: any;
+        try {
+          response = await oraclePayService.generatePaymentPage(oraclePayload);
+        } catch (primaryError: any) {
+          // Some gateways reject decimal amounts; retry with integer payable amount.
+          response = await oraclePayService.generatePaymentPage({
+            ...oraclePayload,
+            payment_amount: fallbackPayableAmount,
+          });
+        }
 
         if (response?.success && response.payment_page_url) {
           window.location.href = response.payment_page_url;
@@ -569,7 +686,11 @@ export default function DepositPage() {
         alert(response?.message || "Failed to create OraclePay payment page");
       } catch (error) {
         console.error("OraclePay auto deposit error:", error);
-        alert("Failed to create OraclePay payment page. Please try again.");
+        const apiMessage =
+          (error as any)?.response?.data?.message ||
+          (error as any)?.response?.data?.error ||
+          (error as any)?.message;
+        alert(apiMessage ? `Failed to create OraclePay payment page: ${apiMessage}` : "Failed to create OraclePay payment page. Please try again.");
       } finally {
         setSubmitting(false);
       }
@@ -587,7 +708,23 @@ export default function DepositPage() {
     );
 
     let amount = 0;
-    if (amountFieldObj && formData[amountFieldObj.name]) {
+    if (activeTab === 'crypto') {
+      if (!Number.isFinite(cryptoUsdNumeric) || cryptoUsdNumeric <= 0) {
+        alert('Please select or enter a valid USD amount for crypto deposit');
+        return;
+      }
+
+      if (!cryptoProofValue) {
+        alert('Please upload payment proof screenshot for crypto deposit');
+        return;
+      }
+
+      amount = cryptoBdtEquivalent;
+      if (!Number.isFinite(amount) || amount <= 0) {
+        alert('Converted BDT amount is invalid. Please adjust your USD amount.');
+        return;
+      }
+    } else if (amountFieldObj && formData[amountFieldObj.name]) {
       amount = parseFloat(formData[amountFieldObj.name]);
       if (isNaN(amount) || amount <= 0) {
         alert(`Please enter a valid amount in the "${amountFieldObj.label}" field`);
@@ -669,6 +806,23 @@ export default function DepositPage() {
       }
 
       if (activeTab === 'crypto') {
+        requestData.amount = cryptoBdtEquivalent;
+        requestData.formData = {
+          ...formData,
+          cryptoUsdAmount: cryptoUsdNumeric,
+          cryptoDisplayCurrency,
+          cryptoDisplayRate,
+          cryptoDisplayConverted,
+          cryptoBdtEquivalent,
+          cryptoProof: cryptoProofValue || '',
+        };
+
+        if (cryptoScreenshotField && formData[cryptoScreenshotField.name]) {
+          requestData.screenshot = formData[cryptoScreenshotField.name];
+        } else if (requestData.formData.cryptoProof) {
+          requestData.screenshot = requestData.formData.cryptoProof;
+        }
+
         const txField = filteredFormFields.find(f =>
           f.name.toLowerCase().includes('transaction') ||
           f.label.toLowerCase().includes('transaction') ||
@@ -720,6 +874,7 @@ export default function DepositPage() {
         setCalculatedTurnover(null);
         setUploadStatus('idle');
         setUploadedFileUrl("");
+        setCryptoProofUrl("");
 
         console.log("Form reset successfully");
       }
@@ -829,31 +984,28 @@ export default function DepositPage() {
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => handleTabChange("manual")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === "manual"
-                ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
-                : "bg-[#0689ff] text-white border border-white"
-            }`}
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "manual"
+              ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
+              : "bg-[#0689ff] text-white border border-white"
+              }`}
           >
             BDT - Manual
           </button>
           <button
             onClick={() => handleTabChange("auto")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === "auto"
-                ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
-                : "bg-[#0689ff] text-white border border-white"
-            }`}
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "auto"
+              ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
+              : "bg-[#0689ff] text-white border border-white"
+              }`}
           >
             Auto Deposit
           </button>
           <button
             onClick={() => handleTabChange("crypto")}
-            className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === "crypto"
-                ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
-                : "bg-[#0689ff] text-white border border-white"
-            }`}
+            className={`py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "crypto"
+              ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md"
+              : "bg-[#0689ff] text-white border border-white"
+              }`}
           >
             Crypto Deposit
           </button>
@@ -875,7 +1027,7 @@ export default function DepositPage() {
                 )}
                 {selectedPromotion.maxBonus && (
                   <span className="text-gray-300 ml-1">
-                    (Max: ৳{selectedPromotion.maxBonus}) 
+                    (Max: ৳{selectedPromotion.maxBonus})
                   </span>
                 )}
               </span>
@@ -908,13 +1060,13 @@ export default function DepositPage() {
               </div>
               <Sparkles className="w-4 h-4 text-yellow-400" />
             </div>
-            
+
             <div className="grid grid-cols-1 gap-3">
               {promotions.filter(p => p.isActive).map((promo, index) => {
                 // Get payment method name if linked
-                const promoMethod = typeof promo.paymentMethodId === 'object' 
-                  ? promo.paymentMethodId 
-                  : promo.paymentMethodId 
+                const promoMethod = typeof promo.paymentMethodId === 'object'
+                  ? promo.paymentMethodId
+                  : promo.paymentMethodId
                     ? paymentMethods.find(m => m._id === promo.paymentMethodId)
                     : null;
 
@@ -922,14 +1074,13 @@ export default function DepositPage() {
                   <div
                     key={promo._id}
                     onClick={() => handleSelectPromotion(promo)}
-                    className={`bg-gradient-to-r ${getPromoGradient(index)} p-[1px]  rounded-xl cursor-pointer transform hover:scale-[1.02] transition-all duration-200 ${
-                      promo.paymentMethodId && selectedMethod && 
-                      ((typeof promo.paymentMethodId === 'object' 
-                        ? promo.paymentMethodId._id 
+                    className={`bg-gradient-to-r ${getPromoGradient(index)} p-[1px]  rounded-xl cursor-pointer transform hover:scale-[1.02] transition-all duration-200 ${promo.paymentMethodId && selectedMethod &&
+                      ((typeof promo.paymentMethodId === 'object'
+                        ? promo.paymentMethodId._id
                         : promo.paymentMethodId) !== selectedMethod._id)
-                        ? 'opacity-50 cursor-not-allowed'
-                        : ''
-                    }`}
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                      }`}
                   >
                     <div className="bg-[#252334] rounded-xl p-3 ">
                       <div className="flex items-center justify-between">
@@ -1010,11 +1161,10 @@ export default function DepositPage() {
                   <div
                     key={method._id}
                     onClick={() => setSelectedMethod(method)}
-                    className={`bg-white rounded-xl p-2 h-14 flex items-center justify-center text-black border-2 cursor-pointer transition-all ${
-                      selectedMethod?._id === method._id
-                        ? 'border-green-500 scale-105 shadow-lg'
-                        : 'border-transparent hover:border-green-300'
-                    }`}
+                    className={`bg-white rounded-xl p-2 h-14 flex items-center justify-center text-black border-2 cursor-pointer transition-all ${selectedMethod?._id === method._id
+                      ? 'border-green-500 scale-105 shadow-lg'
+                      : 'border-transparent hover:border-green-300'
+                      }`}
                   >
                     <div className="w-full h-full flex items-center justify-center">
                       {getMethodIcon(method)}
@@ -1104,18 +1254,17 @@ export default function DepositPage() {
                           />
                           <label
                             htmlFor={`screenshot-${field._id}`}
-                            className={`block w-full rounded-xl px-4 py-3 text-center cursor-pointer transition font-medium ${
-                              formData[field.name] 
-                                ? 'bg-green-600 text-white' 
-                                : uploadStatus === 'error'
+                            className={`block w-full rounded-xl px-4 py-3 text-center cursor-pointer transition font-medium ${formData[field.name]
+                              ? 'bg-green-600 text-white'
+                              : uploadStatus === 'error'
                                 ? 'bg-red-600 text-white'
                                 : 'bg-white text-black hover:brightness-110'
-                            }`}
+                              }`}
                           >
-                            {uploadStatus === 'uploading' ? 'Uploading...' : 
-                             formData[field.name] ? 'Upload Successful!' :
-                             uploadStatus === 'error' ? 'Upload Failed. Try Again.' :
-                             field.label}
+                            {uploadStatus === 'uploading' ? 'Uploading...' :
+                              formData[field.name] ? 'Upload Successful!' :
+                                uploadStatus === 'error' ? 'Upload Failed. Try Again.' :
+                                  field.label}
                           </label>
                           {formData[field.name] && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1149,11 +1298,10 @@ export default function DepositPage() {
                             required={field.required}
                             min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
                             max={field.isBonusField && maxBonusAmount ? maxBonusAmount : undefined}
-                            className={`w-full bg-white border-0 rounded-xl pl-10 pr-4 py-3 text-black text-center text-lg placeholder-black focus:outline-none focus:ring-2 ${
-                              (amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
-                                ? 'focus:ring-red-400 border-2 border-red-400' 
-                                : 'focus:ring-green-400'
-                            }`}
+                            className={`w-full bg-white border-0 rounded-xl pl-10 pr-4 py-3 text-black text-center text-lg placeholder-black focus:outline-none focus:ring-2 ${(amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
+                              ? 'focus:ring-red-400 border-2 border-red-400'
+                              : 'focus:ring-green-400'
+                              }`}
                           />
                           {field.name === amountFieldName && calculatedBonus && (
                             <div className="  left-0 right-0   text-center">
@@ -1229,13 +1377,23 @@ export default function DepositPage() {
             <div className="mb-6">
               <div className="bg-green-900/30 border border-green-800/50 rounded-lg p-3 mb-5 text-xs">
                 <p className="text-green-300 font-medium">
-                  Select an amount and complete the payment through OraclePay. No bonus is applied for auto deposits.
+                  Select an amount and complete the payment through OraclePay.
+                  {autoBonusPercentage > 0
+                    ? ` Bonus ${autoBonusPercentage}% and turnover x${autoTurnoverValue || 0} will be applied.`
+                    : ""}
                 </p>
               </div>
 
               <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
-                <div className="flex items-center justify-center text-xs text-gray-300 mb-3">
-                  <span>Range: ৳{AUTO_DEPOSIT_MIN.toFixed(2)} - ৳{autoDepositMax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <div className="flex items-center justify-between text-xs text-gray-300 mb-3">
+                  <span>
+                    Minimum: ৳{AUTO_DEPOSIT_MIN.toFixed(2)} - Maximum: ৳{autoDepositMax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  {autoTurnoverValue > 0 && (
+                    <span className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full font-semibold">
+                      Turnover x{autoTurnoverValue}
+                    </span>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {AUTO_AMOUNT_PRESETS.map((preset) => (
@@ -1243,11 +1401,16 @@ export default function DepositPage() {
                       key={preset}
                       type="button"
                       onClick={() => handleAutoAmountSelect(preset)}
-                      className={`rounded-xl py-3 text-sm font-bold transition-colors ${String(preset) === (autoDepositAmount || formData[amountFieldName])
+                      className={`relative rounded-xl py-3 text-sm font-bold transition-colors ${String(preset) === (autoDepositAmount || formData[amountFieldName])
                         ? 'bg-[#f3bf08] text-black'
                         : 'bg-white/80 text-gray-700 hover:bg-white'
-                      }`}
+                        }`}
                     >
+                      {autoBonusPercentage > 0 && (
+                        <span className="absolute -top-2 right-2 bg-[#f3bf08] text-black text-[11px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                          +{autoBonusPercentage}%
+                        </span>
+                      )}
                       {preset}
                     </button>
                   ))}
@@ -1258,14 +1421,13 @@ export default function DepositPage() {
               {paymentMethods.length > 0 && (
                 <div className="flex justify-center gap-4 mb-4">
                   {paymentMethods.map((method) => (
-                    <div 
-                      key={method._id} 
+                    <div
+                      key={method._id}
                       onClick={() => setSelectedMethod(method)}
-                      className={`w-24 h-24 rounded-full flex items-center justify-center p-1 cursor-pointer transition-all ${
-                        selectedMethod?._id === method._id
-                          ? 'bg-gradient-to-r from-green-500 to-green-600 scale-105'
-                          : 'bg-white/10 hover:bg-white/20'
-                      }`}
+                      className={`w-24 h-24 rounded-full flex items-center justify-center p-1 cursor-pointer transition-all ${selectedMethod?._id === method._id
+                        ? 'bg-gradient-to-r from-green-500 to-green-600 scale-105'
+                        : 'bg-white/10 hover:bg-white/20'
+                        }`}
                     >
                       <div className="w-full h-full bg-white rounded-full flex items-center justify-center p-2">
                         {method.icon ? (
@@ -1360,11 +1522,10 @@ export default function DepositPage() {
                             required={field.required}
                             min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
                             max={field.isBonusField && maxBonusAmount ? maxBonusAmount : undefined}
-                            className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-4 text-black text-center text-xl placeholder-black border-2 ${
-                              (amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
-                                ? 'border-red-400' 
-                                : 'border-[#d12d4d]'
-                            } focus:outline-none focus:ring-2 focus:ring-red-400`}
+                            className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-4 text-black text-center text-xl placeholder-black border-2 ${(amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
+                              ? 'border-red-400'
+                              : 'border-[#d12d4d]'
+                              } focus:outline-none focus:ring-2 focus:ring-red-400`}
                           />
                           {field.name === amountFieldName && calculatedBonus && (
                             <div className="absolute -bottom-5 left-0 right-0 text-center">
@@ -1432,14 +1593,13 @@ export default function DepositPage() {
             {/* Network Selection */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               {paymentMethods.map((method) => (
-                <div 
-                  key={method._id} 
+                <div
+                  key={method._id}
                   onClick={() => setSelectedMethod(method)}
-                  className={`bg-white rounded-xl p-3 border-2 cursor-pointer transition-all ${
-                    selectedMethod?._id === method._id
-                      ? 'border-green-500 scale-105 shadow-lg'
-                      : 'border-gray-700 hover:border-green-300'
-                  }`}
+                  className={`bg-white rounded-xl p-3 border-2 cursor-pointer transition-all ${selectedMethod?._id === method._id
+                    ? 'border-green-500 scale-105 shadow-lg'
+                    : 'border-gray-700 hover:border-green-300'
+                    }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     {method.icon ? (
@@ -1456,6 +1616,78 @@ export default function DepositPage() {
                 </div>
               ))}
             </div>
+
+            <div className="mb-5 rounded-xl border border-blue-500/30 bg-blue-900/20 p-4">
+              <p className="text-sm font-semibold text-blue-200 mb-3">Select USD Amount</p>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {CRYPTO_USD_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => handleCryptoUsdSelect(preset)}
+                    className={`rounded-lg py-2 text-sm font-semibold transition ${Number(cryptoUsdAmount) === preset
+                      ? 'bg-blue-400 text-black'
+                      : 'bg-white/80 text-gray-800 hover:bg-white'
+                      }`}
+                  >
+                    ${preset}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-blue-100 block mb-1">USD Amount</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={cryptoUsdAmount}
+                    onChange={(e) => setCryptoUsdAmount(e.target.value)}
+                    placeholder="Enter USD"
+                    className="w-full rounded-lg bg-white px-3 py-2 text-black"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-blue-100 block mb-1">Show Conversion In</label>
+                  <select
+                    value={cryptoDisplayCurrency}
+                    onChange={(e) => setCryptoDisplayCurrency(e.target.value as 'BDT' | 'CNY' | 'VND')}
+                    className="w-full rounded-lg bg-white px-3 py-2 text-black"
+                  >
+                    <option value="BDT">Bangladesh Taka (BDT)</option>
+                    <option value="CNY">Chinese Yuan (CNY)</option>
+                    <option value="VND">Vietnamese Dong (VND)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg bg-black/20 p-3 text-sm text-blue-50">
+                <p>
+                  1 USD = {cryptoDisplayRate.toLocaleString(undefined, { maximumFractionDigits: 4 })} {cryptoDisplayCurrency}
+                </p>
+                <p className="font-semibold mt-1">
+                  Converted ({cryptoDisplayCurrency}): {cryptoDisplayConverted > 0 ? cryptoDisplayConverted.toLocaleString() : '0.00'}
+                </p>
+                <p className="font-semibold text-emerald-300 mt-1">
+                  BDT Wallet Credit Equivalent: ৳{cryptoBdtEquivalent > 0 ? cryptoBdtEquivalent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                </p>
+              </div>
+            </div>
+
+            {!cryptoScreenshotField && (
+              <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-900/20 p-4">
+                <p className="text-sm font-semibold text-amber-200 mb-2">Upload Payment Proof (Required)</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileUpload(e, '__cryptoProof')}
+                  className="block w-full text-sm text-amber-100 file:mr-3 file:rounded-md file:border-0 file:bg-amber-500 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-black"
+                />
+                {cryptoProofValue && (
+                  <div className="mt-2 text-xs text-green-300">Proof uploaded successfully</div>
+                )}
+              </div>
+            )}
 
             {/* Instructions - Filtered by payment method */}
             {filteredInstructions.length > 0 && (
@@ -1629,11 +1861,10 @@ export default function DepositPage() {
                           required={field.required}
                           min={field.name === amountFieldName && minDepositAmount ? minDepositAmount : undefined}
                           max={field.isBonusField && maxBonusAmount ? maxBonusAmount : undefined}
-                          className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-3 text-black border-2 ${
-                            (amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
-                              ? 'border-red-400' 
-                              : 'border-[#fc0613]'
-                          } text-center placeholder-black focus:outline-none focus:ring-2 focus:ring-red-400`}
+                          className={`w-full bg-[#fdfde8] border-0 rounded-xl pl-10 pr-4 py-3 text-black border-2 ${(amountError && field.name === amountFieldName) || (bonusFieldError && field.isBonusField)
+                            ? 'border-red-400'
+                            : 'border-[#fc0613]'
+                            } text-center placeholder-black focus:outline-none focus:ring-2 focus:ring-red-400`}
                         />
                         {field.name === amountFieldName && calculatedBonus && (
                           <div className="absolute -bottom-5 left-0 right-0 text-center">

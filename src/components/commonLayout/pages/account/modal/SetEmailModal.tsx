@@ -5,10 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import { 
   Lock, 
   Mail, 
-  Key, 
   AlertCircle,
   ChevronLeft,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import { accountService } from "@/services/api/account.service";
 
 interface SetEmailModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ interface SetEmailModalProps {
 export default function SetEmailModal({ isOpen, onClose }: SetEmailModalProps) {
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Close on ESC or outside click
@@ -46,14 +47,34 @@ export default function SetEmailModal({ isOpen, onClose }: SetEmailModalProps) {
 
   if (!isOpen) return null;
 
-  const handleSendCode = () => {
-    alert("Verification code sent to: " + email);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Submitted:\nPassword: ${password}\nEmail: ${email}\nCode: ${code}`);
-    onClose();
+
+    if (!email.trim()) {
+      toast.error("Please enter email");
+      return;
+    }
+
+    if (!password.trim()) {
+      toast.error("Please enter your login password");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await accountService.updateCurrentUser({
+        email: email.trim(),
+        currentPassword: password,
+      });
+      toast.success("Email updated successfully");
+      setPassword("");
+      setEmail("");
+      onClose();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to update email");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -102,32 +123,11 @@ export default function SetEmailModal({ isOpen, onClose }: SetEmailModalProps) {
               placeholder="Please enter email"
               className="w-full pl-10 pr-4 py-3 bg-[#252334] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
             />
-            <button
-              type="button"
-              onClick={handleSendCode}
-              className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Send
-            </button>
-          </div>
-
-          {/* Verification Code */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Key className="w-5 h-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Please enter email verification code"
-              className="w-full pl-10 pr-4 py-3 bg-[#252334] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-            />
           </div>
 
           {/* Warning */}
           <div className="flex items-start gap-2 p-3 bg-[#252334] rounded-lg">
-            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
             <p className="text-gray-300 text-sm">
               In order to protect your account and fund security, please bind the email
             </p>
@@ -136,9 +136,10 @@ export default function SetEmailModal({ isOpen, onClose }: SetEmailModalProps) {
           {/* Commit Button */}
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+            disabled={submitting}
+            className="w-full py-3 bg-linear-to-r from-yellow-500 to-orange-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity shadow-lg disabled:opacity-60"
           >
-            Commit
+            {submitting ? "Saving..." : "Commit"}
           </button>
         </form>
 

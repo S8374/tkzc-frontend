@@ -39,6 +39,8 @@ export default function AdminDepositRequests() {
   const [showDetails, setShowDetails] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [adminNote, setAdminNote] = useState("");
+  const [bonusAmount, setBonusAmount] = useState<number>(0);
+  const [turnoverRequired, setTurnoverRequired] = useState<number>(0);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -56,6 +58,14 @@ export default function AdminDepositRequests() {
   useEffect(() => {
     fetchRequests();
   }, [debouncedSearch, currentPage, statusFilter, typeFilter]);
+
+  // Handle modal initialization
+  useEffect(() => {
+    if (showApproveModal && selectedRequest) {
+      setBonusAmount(selectedRequest.bonusAmount || 0);
+      setTurnoverRequired(selectedRequest.turnoverRequired || 0);
+    }
+  }, [showApproveModal, selectedRequest]);
 
   const fetchRequests = async () => {
     try {
@@ -94,9 +104,16 @@ export default function AdminDepositRequests() {
     
     try {
       setProcessingId(selectedRequest._id);
-      await depositRequestService.approveRequest(selectedRequest._id, adminNote);
+      await depositRequestService.approveRequest(
+        selectedRequest._id, 
+        adminNote, 
+        Number(bonusAmount), 
+        Number(turnoverRequired)
+      );
       setShowApproveModal(false);
       setAdminNote("");
+      setBonusAmount(0);
+      setTurnoverRequired(0);
       setSelectedRequest(null);
       fetchRequests();
     } catch (error) {
@@ -179,6 +196,17 @@ export default function AdminDepositRequests() {
     const rejected = stats.find(s => s._id === 'REJECTED') || { count: 0, totalAmount: 0, totalBonus: 0 };
 
     return { pending, approved, rejected };
+  };
+
+  const getCryptoMeta = (request: DepositRequest) => {
+    const form = request.formData || {};
+    return {
+      usdAmount: Number(form.cryptoUsdAmount || 0),
+      displayCurrency: form.cryptoDisplayCurrency || '',
+      displayConverted: Number(form.cryptoDisplayConverted || 0),
+      bdtEquivalent: Number(form.cryptoBdtEquivalent || request.amount || 0),
+      proof: (form.cryptoProof || form.__cryptoProof || request.screenshot || '') as string,
+    };
   };
 
   const s = getStats();
@@ -335,6 +363,17 @@ export default function AdminDepositRequests() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-bold">৳{request.amount}</div>
+                          {request.depositType === 'crypto' && (() => {
+                            const cryptoMeta = getCryptoMeta(request);
+                            return cryptoMeta.usdAmount > 0 ? (
+                              <div className="text-xs text-cyan-300 mt-1">
+                                ${cryptoMeta.usdAmount} USD
+                                {cryptoMeta.displayCurrency && cryptoMeta.displayConverted > 0
+                                  ? ` -> ${cryptoMeta.displayConverted} ${cryptoMeta.displayCurrency}`
+                                  : ''}
+                              </div>
+                            ) : null;
+                          })()}
                           {(request.bonusAmount ?? 0) > 0 && (
                             <div className="text-xs text-green-400 flex items-center gap-1">
                               <Gift className="w-3 h-3" />
@@ -533,6 +572,44 @@ export default function AdminDepositRequests() {
           </div>
         </div>
 
+        {selectedRequest.depositType === 'crypto' && (() => {
+          const cryptoMeta = getCryptoMeta(selectedRequest);
+          return (
+            <div className="bg-gray-700 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-gray-400 mb-2">Crypto Conversion</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-300">USD Amount:</span>
+                  <span className="text-white">${cryptoMeta.usdAmount || 0}</span>
+                </div>
+                {cryptoMeta.displayCurrency && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Display Conversion:</span>
+                    <span className="text-white">
+                      {cryptoMeta.displayConverted || 0} {cryptoMeta.displayCurrency}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-gray-600 pt-2">
+                  <span className="text-gray-300">BDT Credit Equivalent:</span>
+                  <span className="text-emerald-400 font-bold">৳{cryptoMeta.bdtEquivalent.toFixed(2)}</span>
+                </div>
+                {cryptoMeta.proof && (
+                  <div className="pt-3 border-t border-gray-600">
+                    <p className="text-xs text-gray-400 mb-2">Payment Proof</p>
+                    <img
+                      src={cryptoMeta.proof}
+                      alt="Crypto payment proof"
+                      className="max-h-40 rounded-lg border border-gray-600 cursor-pointer hover:opacity-90"
+                      onClick={() => window.open(cryptoMeta.proof, '_blank')}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Form Data - Dynamic Fields */}
         {selectedRequest.formData && Object.keys(selectedRequest.formData).length > 0 && (
           <div className="bg-gray-700 rounded-lg p-4">
@@ -654,10 +731,43 @@ export default function AdminDepositRequests() {
               <textarea
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                rows={2}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                 placeholder="Add a note for the user..."
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  Bonus Amount
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">৳</span>
+                  <input
+                    type="number"
+                    value={bonusAmount}
+                    onChange={(e) => setBonusAmount(Number(e.target.value))}
+                    className="w-full pl-7 pr-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  Turnover Required
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">৳</span>
+                  <input
+                    type="number"
+                    value={turnoverRequired}
+                    onChange={(e) => setTurnoverRequired(Number(e.target.value))}
+                    className="w-full pl-7 pr-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">
