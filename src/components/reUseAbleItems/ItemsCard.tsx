@@ -23,6 +23,7 @@ interface CardProps {
   icon?: ReactNode;
   className?: string;
   rounded?: boolean;
+  loadingItemId?: string | number | null;
 }
 
 const ItemsCard = ({
@@ -34,6 +35,7 @@ const ItemsCard = ({
   icon,
   className = "",
   rounded = true,
+  loadingItemId = null,
 }: CardProps) => {
   return (
     <div className={`flex flex-col ${className}`}>
@@ -57,10 +59,13 @@ const ItemsCard = ({
         {items.map((item) => (
           <div
             key={item.id}
-            onClick={item.onClick}
+            onClick={() => {
+              if (loadingItemId === item.id) return;
+              item.onClick?.();
+            }}
             className={`group flex flex-col border border-black/30 overflow-hidden cursor-pointer bg-black/20 backdrop-blur-sm hover:border-white/30 transition-all ${
               rounded ? "rounded-lg" : ""
-            } ${item.onClick ? "hover:scale-[1.02]" : ""}`}
+            } ${item.onClick ? "hover:scale-[1.02]" : ""} ${loadingItemId === item.id ? "opacity-60 cursor-not-allowed" : ""}`}
             style={{
               width: cardWidth.base,
             }}
@@ -79,6 +84,11 @@ const ItemsCard = ({
                   (e.currentTarget as HTMLImageElement).src = "https://via.placeholder.com/300x200?text=No+Image";
                 }}
               />
+              {loadingItemId === item.id && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+                </div>
+              )}
             </div>
 
             {/* Text

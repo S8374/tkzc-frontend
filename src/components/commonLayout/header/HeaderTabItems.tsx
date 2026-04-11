@@ -12,8 +12,13 @@ import HomeTabContent from "./tabContent/HomeTabContent";
 import { sliderTypeService } from "@/services/api/slider.types";
 import { sliderService } from "@/services/api/slider.service";
 import { oracleService } from "@/services/api/oracel.service";
+import { oracleGameApi } from "@/services/oracle.Game.Api";
+import { walletService } from "@/services/api/wallet.api";
+import { useAuth } from "@/context/AuthContext";
+import { openGameInIframe } from "@/lib/gameIframe";
 import SearchField from "@/components/reUseAbleItems/SearchField";
 import ItemsCard from "@/components/reUseAbleItems/ItemsCard";
+import toast from "react-hot-toast";
 
 // Map of icons for different tab types
 const iconMap: Record<string, any> = {
@@ -262,10 +267,76 @@ const DynamicTabContent = ({
   translatedName?: string;
 }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [sliders, setSliders] = useState<any[]>([]);
   const [gameImageMap, setGameImageMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [launchingItemId, setLaunchingItemId] = useState<string | number | null>(null);
+
+  const resolveLaunchMoney = async () => {
+    const fallbackMoney = Number((user as any)?.wallet?.balance || 0);
+    if (Number.isFinite(fallbackMoney) && fallbackMoney > 0) {
+      return fallbackMoney;
+    }
+
+    try {
+      const walletResponse = await walletService.getMyWallet();
+      const apiBalance = Number(walletResponse?.data?.balance || 0);
+      if (Number.isFinite(apiBalance) && apiBalance > 0) {
+        return apiBalance;
+      }
+    } catch {
+      // Ignore wallet fetch failure and use fallback amount.
+    }
+
+    return 0;
+  };
+
+  const handleGameLaunch = async (item: any) => {
+    if (launchingItemId === item?._id) return;
+
+    setLaunchingItemId(item?._id ?? null);
+    try {
+      if (item?.provider_code && item?.game_code) {
+        const launchMoney = await resolveLaunchMoney();
+
+        const payload = {
+          username: user?.name || user?.email || "guest_user",
+          money: launchMoney,
+          provider_code: item.provider_code,
+          game_code: item.game_code || 0,
+          game_type: item.game_type || 0,
+        };
+
+        console.log("[Oracle Launch Payload]", payload);
+
+        const response = await oracleGameApi.launchGame(payload);
+        console.log("[Oracle Launch Response]", response);
+        console.log("[Oracle Launch Full JSON]", JSON.stringify(response, null, 2));
+
+        if (response?.success && response?.url) {
+          openGameInIframe(response.url);
+          return;
+        }
+
+        toast.error(response?.message || "Unable to launch game");
+        return;
+      }
+
+      if (item?.imageRedirectLink) {
+        console.log("[Fallback Redirect Link]", item.imageRedirectLink);
+        if (typeof item.imageRedirectLink === "string") {
+          openGameInIframe(item.imageRedirectLink);
+        }
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || "Unable to launch game");
+      console.error("[Oracle Launch Error]", error?.response?.data || error?.message || error);
+    } finally {
+      setLaunchingItemId(null);
+    }
+  };
 
   useEffect(() => {
     const fetchSliders = async () => {
@@ -349,9 +420,7 @@ const DynamicTabContent = ({
       gameImageMap[`${item.provider_code}:${item.game_code}`] ||
       "https://via.placeholder.com/300x200?text=No+Image",
     onClick: () => {
-      if (item.imageRedirectLink) {
-        window.open(item.imageRedirectLink, "_blank");
-      }
+      void handleGameLaunch(item);
     },
   }));
 
@@ -378,6 +447,7 @@ const DynamicTabContent = ({
 
       <ItemsCard
         items={mappedItems}
+        loadingItemId={launchingItemId}
         title={searchQuery ? t('common.search_results', 'Search Results') : `${displayName} ${t('common.games', 'Games')}`}
         rounded={false}
         icon="🎮"

@@ -5,6 +5,7 @@ import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import LanguageProvider from "@/context/LanguageProvider";
+import GameIframeHost from "@/components/commonLayout/model/GameIframeHost";
 
 // Load Poppins font
 const poppins = Poppins({
@@ -32,6 +33,7 @@ export default function RootLayout({
 
         <AuthProvider>
         {children}
+        <GameIframeHost />
         </AuthProvider>
         <Toaster position="top-right" reverseOrder={false} />
         </LanguageProvider>

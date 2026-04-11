@@ -17,6 +17,9 @@ interface CardSliderItem {
     subtitle?: string;
     imageUrl: string;
     extra?: ReactNode;
+    provider_code?: string;
+    game_code?: string;
+    game_type?: string;
 }
 
 interface CardSliderProps {
@@ -29,6 +32,7 @@ interface CardSliderProps {
     className?: string;
     rounded?: boolean; // optional rounded control
     showArrows?: boolean; // ✅ NEW
+    onCardClick?: (item: CardSliderItem) => Promise<void>; // ✅ NEW
 
 }
 
@@ -42,11 +46,13 @@ export default function CardSlider({
     className = "",
     rounded = true,
     showArrows = true, // ✅ default: show arrows
+    onCardClick, // ✅ NEW
 
 }: CardSliderProps) {
     const [swiper, setSwiper] = useState<any>(null);
     const [isBeginning, setIsBeginning] = useState(true);
     const [isEnd, setIsEnd] = useState(false);
+    const [launchingId, setLaunchingId] = useState<string | number | null>(null); // ✅ NEW
 
     const syncState = (s: any) => {
         if (!s) return;
@@ -102,7 +108,7 @@ export default function CardSlider({
                 }}
                 onSlideChange={syncState}
                 onResize={syncState}
-                className="w-full !overflow-visible"
+                className="w-full overflow-visible!"
             >
                 {items.map((item) => (
                     <SwiperSlide
@@ -110,10 +116,21 @@ export default function CardSlider({
                         style={{
                             width: cardWidth.base, // dynamic width for base
                         }}
-                        className="!overflow-visible"
+                        className="overflow-visible!"
                     >
-                        <div
-                            className={`group flex flex-col border border-black/30 overflow-hidden cursor-pointer bg-black/20 backdrop-blur-sm hover:border-white/30 transition-all ${roundedClass}`}
+                        <button
+                            onClick={async () => {
+                                if (onCardClick && item.provider_code && item.game_code) {
+                                    setLaunchingId(item.id);
+                                    try {
+                                        await onCardClick(item);
+                                    } finally {
+                                        setLaunchingId(null);
+                                    }
+                                }
+                            }}
+                            disabled={launchingId === item.id}
+                            className={`group flex flex-col border border-black/30 overflow-hidden cursor-pointer bg-black/20 backdrop-blur-sm hover:border-white/30 transition-all w-full ${roundedClass} ${launchingId === item.id ? 'opacity-60 cursor-not-allowed' : ''}`}
                             style={{
                                 borderRadius: rounded ? undefined : 0,
                             }}
@@ -126,9 +143,14 @@ export default function CardSlider({
                                 <img
                                     src={item.imageUrl}
                                     alt={item.title}
-                                    className="absolute bg-no-repeat bg-cover bg-contain inset-0 w-full h-full transition-transform duration-300 group-hover:scale-105"
+                                    className="absolute bg-no-repeat bg-cover inset-0 w-full h-full transition-transform duration-300 group-hover:scale-105"
                                     loading="lazy"
                                 />
+                                {launchingId === item.id && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Text */}
@@ -143,7 +165,7 @@ export default function CardSlider({
                                 )}
                                 {item.extra && <div className="mt-1">{item.extra}</div>}
                             </div> */}
-                        </div>
+                        </button>
                     </SwiperSlide>
                 ))}
             </Swiper>
