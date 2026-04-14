@@ -36,7 +36,10 @@ const MarqueeAdmin = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
     const [formData, setFormData] = useState({
-        text: "",
+        textEn: "",
+        textZh: "",
+        textVi: "",
+        textBn: "",
         isActive: true,
         order: 0,
         startDate: "",
@@ -84,8 +87,8 @@ const MarqueeAdmin = () => {
     const handleBlur = (field: string) => {
         setTouched(prev => ({ ...prev, [field]: true }));
         
-        if (field === 'text' && !formData.text.trim()) {
-            setErrors(prev => ({ ...prev, text: 'Marquee text is required' }));
+        if (field === 'textEn' && !formData.textEn.trim()) {
+            setErrors(prev => ({ ...prev, textEn: 'English marquee text is required' }));
         }
     };
 
@@ -93,7 +96,10 @@ const MarqueeAdmin = () => {
     const openCreateModal = () => {
         setEditingMarquee(null);
         setFormData({
-            text: "",
+            textEn: "",
+            textZh: "",
+            textVi: "",
+            textBn: "",
             isActive: true,
             order: marquees.length + 1,
             startDate: "",
@@ -107,8 +113,12 @@ const MarqueeAdmin = () => {
     // Open edit modal
     const openEditModal = (marquee: Marquee) => {
         setEditingMarquee(marquee);
+        const textEn = marquee.textTranslations?.en || marquee.text || "";
         setFormData({
-            text: marquee.text,
+            textEn,
+            textZh: marquee.textTranslations?.zh || "",
+            textVi: marquee.textTranslations?.vi || "",
+            textBn: marquee.textTranslations?.bn || "",
             isActive: marquee.isActive,
             order: marquee.order,
             startDate: marquee.startDate ? new Date(marquee.startDate).toISOString().split('T')[0] : "",
@@ -129,8 +139,8 @@ const MarqueeAdmin = () => {
     const validateForm = () => {
         const newErrors: Record<string, string> = {};
         
-        if (!formData.text.trim()) {
-            newErrors.text = 'Marquee text is required';
+        if (!formData.textEn.trim()) {
+            newErrors.textEn = 'English marquee text is required';
         }
         
         if (formData.startDate && formData.endDate) {
@@ -148,8 +158,18 @@ const MarqueeAdmin = () => {
         if (!validateForm()) return;
 
         try {
+            const textEn = formData.textEn.trim();
+            const textZh = formData.textZh.trim();
+            const textVi = formData.textVi.trim();
+            const textBn = formData.textBn.trim();
             const dataToSend: any = {
-                text: formData.text,
+                text: textEn,
+                textTranslations: {
+                    en: textEn,
+                    ...(textZh ? { zh: textZh } : {}),
+                    ...(textVi ? { vi: textVi } : {}),
+                    ...(textBn ? { bn: textBn } : {}),
+                },
                 isActive: formData.isActive,
                 order: formData.order,
             };
@@ -176,8 +196,18 @@ const MarqueeAdmin = () => {
         if (!validateForm()) return;
 
         try {
+            const textEn = formData.textEn.trim();
+            const textZh = formData.textZh.trim();
+            const textVi = formData.textVi.trim();
+            const textBn = formData.textBn.trim();
             const dataToSend: any = {
-                text: formData.text,
+                text: textEn,
+                textTranslations: {
+                    en: textEn,
+                    ...(textZh ? { zh: textZh } : {}),
+                    ...(textVi ? { vi: textVi } : {}),
+                    ...(textBn ? { bn: textBn } : {}),
+                },
                 isActive: formData.isActive,
                 order: formData.order,
             };
@@ -217,7 +247,7 @@ const MarqueeAdmin = () => {
     };
 
     // Toggle active status
-    const toggleActive = async (id: string, current: boolean, text: string) => {
+    const toggleActive = async (id: string, current: boolean) => {
         try {
             await marqueeService.updateMarquee(id, {
                 isActive: !current,
@@ -260,7 +290,21 @@ const MarqueeAdmin = () => {
 
     // Filter marquees
     const filteredMarquees = marquees
-        .filter(m => m.text.toLowerCase().includes(searchTerm.toLowerCase()))
+        .filter(m => {
+            const query = searchTerm.toLowerCase();
+            const localizedPool = [
+                m.text,
+                m.textTranslations?.en,
+                m.textTranslations?.zh,
+                m.textTranslations?.vi,
+                m.textTranslations?.bn,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            return localizedPool.includes(query);
+        })
         .filter(m => {
             if (filterStatus === 'all') return true;
             return filterStatus === 'active' ? m.isActive : !m.isActive;
@@ -528,7 +572,7 @@ const MarqueeAdmin = () => {
                                 
                                 <div className="col-span-2 flex items-center gap-2">
                                     <button
-                                        onClick={() => toggleActive(marquee._id, marquee.isActive, marquee.text)}
+                                        onClick={() => toggleActive(marquee._id, marquee.isActive)}
                                         className={`p-2 rounded-lg transition-all ${
                                             marquee.isActive 
                                                 ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30' 
@@ -590,33 +634,69 @@ const MarqueeAdmin = () => {
 
                         {/* Modal Body */}
                         <div className="p-6 space-y-5">
-                            {/* Text */}
+                            {/* Text (multi-language) */}
                             <div className="space-y-2">
                                 <label className="block text-sm font-medium text-gray-300">
-                                    Marquee Text <span className="text-red-500">*</span>
+                                    Marquee Text (English) <span className="text-red-500">*</span>
                                 </label>
                                 <div className="relative">
                                     <Type className="absolute left-3 top-3 w-5 h-5 text-gray-500" />
                                     <textarea
-                                        name="text"
-                                        value={formData.text}
+                                        name="textEn"
+                                        value={formData.textEn}
                                         onChange={handleInputChange}
-                                        onBlur={() => handleBlur('text')}
+                                        onBlur={() => handleBlur('textEn')}
                                         rows={3}
                                         className={`w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border ${
-                                            touched.text && errors.text
+                                            touched.textEn && errors.textEn
                                                 ? 'border-red-500/50 focus:border-red-500'
                                                 : 'border-gray-700 focus:border-yellow-500/50'
                                         } text-white placeholder-gray-500 focus:outline-none transition-colors resize-none`}
-                                        placeholder="Enter your marquee text here..."
+                                        placeholder="Enter marquee text in English..."
                                     />
                                 </div>
-                                {touched.text && errors.text && (
+                                {touched.textEn && errors.textEn && (
                                     <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
                                         <AlertCircle className="w-4 h-4" />
-                                        {errors.text}
+                                        {errors.textEn}
                                     </p>
                                 )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <label className="block text-xs text-gray-400">Chinese (ZH)</label>
+                                    <textarea
+                                        name="textZh"
+                                        value={formData.textZh}
+                                        onChange={handleInputChange}
+                                        rows={2}
+                                        className="w-full px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors resize-none"
+                                        placeholder="Optional Chinese text"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-xs text-gray-400">Vietnamese (VI)</label>
+                                    <textarea
+                                        name="textVi"
+                                        value={formData.textVi}
+                                        onChange={handleInputChange}
+                                        rows={2}
+                                        className="w-full px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors resize-none"
+                                        placeholder="Optional Vietnamese text"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-xs text-gray-400">Bangla (BN)</label>
+                                    <textarea
+                                        name="textBn"
+                                        value={formData.textBn}
+                                        onChange={handleInputChange}
+                                        rows={2}
+                                        className="w-full px-3 py-2 rounded-xl bg-gray-900/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 transition-colors resize-none"
+                                        placeholder="Optional Bangla text"
+                                    />
+                                </div>
                             </div>
 
                             {/* Order */}

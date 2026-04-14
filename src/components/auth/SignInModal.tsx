@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { authService } from "@/services/api/auth.services";
-import ReCAPTCHA from "react-google-recaptcha";
+import MathCaptcha from "./MathCaptcha";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -75,7 +75,14 @@ export default function SignInModal({
       if (res?.success) {
         onLoginSuccess();
         onClose();
-        router.push("/deposit");
+        
+        const userRole = res.data?.role || res.data?.user?.role;
+        if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
+          router.push("/admin/marquee");
+        } else {
+          router.push("/");
+        }
+
         toast.success(t('auth.loginSuccess', 'Login successful 🎉'));
       }
     } catch (err: any) {
@@ -166,15 +173,19 @@ export default function SignInModal({
             <span className="text-gray-300">{t('auth.iAmHuman', 'I am human')}</span>
           </div>
 
-          {/* CAPTCHA */}
+          {/* Custom Math CAPTCHA */}
           {showCaptcha && (
-            <div className="flex justify-center mt-2">
-              <ReCAPTCHA
-                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY as string}
-                onChange={() => {
+            <div className="mt-2">
+              <MathCaptcha
+                onSuccess={() => {
                   setImHuman(true);
                   toast.success(t('auth.humanVerified', 'Human verified ✅'));
+                  setShowCaptcha(false);
                 }}
+                onError={() => {
+                  setImHuman(false);
+                }}
+                theme="dark"
               />
             </div>
           )}

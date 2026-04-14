@@ -24,18 +24,18 @@ export default function DashboardLayout({
   }, [user, loading]);
 
   if (loading) {
-    return <div className="p-10">Loading...</div>;
+    return <div className="min-h-screen bg-gray-900 p-10 text-gray-300">Loading...</div>;
   }
 
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex min-h-screen bg-gray-900">
       <DashboardSidebar role={user.role as UserRole} />
 
       <div className="flex flex-col flex-1">
         <DashboardHeader />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 bg-gray-900">{children}</main>
       </div>
     </div>
   );

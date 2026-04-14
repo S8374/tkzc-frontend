@@ -120,10 +120,10 @@ export default function MyWalletPage() {
 
   const getProtocolIcon = (protocol?: string) => {
     switch (protocol) {
-      case 'TRC20': return <Globe className="w-4 h-4" />;
-      case 'ERC20': return <Globe className="w-4 h-4" />;
-      case 'BEP20': return <Globe className="w-4 h-4" />;
-      default: return <Shield className="w-4 h-4" />;
+      case 'TRC20': return <Globe className="w-4 h-4 text-white" />;
+      case 'ERC20': return <Globe className="w-4 h-4 text-white" />;
+      case 'BEP20': return <Globe className="w-4 h-4 text-white" />;
+      default: return <Shield className="w-4 h-4 text-white" />;
     }
   };
 
@@ -162,7 +162,7 @@ export default function MyWalletPage() {
 
       {/* Wallet Card */}
       <div className="max-w-md mx-auto px-4 mt-6">
-        <div className="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl p-6 shadow-xl border border-purple-500/30">
+        <div className="bg-linear-to-br from-purple-900 to-indigo-900 rounded-2xl p-6 shadow-xl border border-purple-500/30">
           {/* Balance Section */}
           <div className="text-center mb-6">
             <p className="text-gray-300 text-sm mb-1">Total Balance</p>
@@ -174,14 +174,14 @@ export default function MyWalletPage() {
                 onClick={() => router.push('/deposit')}
                 className="flex items-center gap-1 px-4 py-2 bg-green-600 rounded-lg text-sm font-medium hover:bg-green-700 transition"
               >
-                <ArrowUpRight className="w-4 h-4" />
+                <ArrowUpRight className="w-4 h-4 text-white" />
                 Deposit
               </button>
               <button
                 onClick={() => router.push('/withdraw')}
                 className="flex items-center gap-1 px-4 py-2 bg-red-600 rounded-lg text-sm font-medium hover:bg-red-700 transition"
               >
-                <ArrowDownLeft className="w-4 h-4" />
+                <ArrowDownLeft className="w-4 h-4 text-white" />
                 Withdraw
               </button>
             </div>
@@ -255,7 +255,7 @@ export default function MyWalletPage() {
             onClick={() => setIsEditing(true)}
             className="w-full mt-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg flex items-center justify-center gap-2 transition"
           >
-            <Edit className="w-4 h-4" />
+            <Edit className="w-4 h-4 text-white" />
             Edit Wallet Settings
           </button>
         </div>
@@ -266,14 +266,14 @@ export default function MyWalletPage() {
             onClick={() => router.push('/history')}
             className="bg-gray-800 rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-gray-700 transition"
           >
-            <History className="w-6 h-6 text-blue-400" />
+            <History className="w-6 h-6 text-white" />
             <span className="text-sm">Transaction History</span>
           </button>
           <button
             onClick={() => router.push('/settings')}
             className="bg-gray-800 rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-gray-700 transition"
           >
-            <Lock className="w-6 h-6 text-green-400" />
+            <Lock className="w-6 h-6 text-white" />
             <span className="text-sm">Security Settings</span>
           </button>
         </div>

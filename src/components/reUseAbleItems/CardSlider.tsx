@@ -68,28 +68,32 @@ export default function CardSlider({
             {(title || icon) && (
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-background font-semibold">
-                        {icon} <span>{title}</span>
+                        {icon} <span className="text-white">{title}</span>
                     </div>
 
 
                     {showArrows && (
                         <div className="flex gap-2">
                             <Button
+                                variant="secondary"
+                                size="icon"
                                 onClick={() => swiper?.slidePrev()}
                                 disabled={!swiper || isBeginning}
-                                className={`w-8 h-8 flex items-center justify-center text-foreground
-          ${isBeginning ? "opacity-40 cursor-not-allowed" : "hover:bg-black/30"}`}
+                                className={`w-8 h-8 flex items-center justify-center bg-white text-black hover:bg-gray-200 hover:text-black shadow-sm
+          ${isBeginning ? "opacity-40 cursor-not-allowed" : ""}`}
                             >
-                                <ArrowLeft />
+                                <ArrowLeft className="w-4 h-4" />
                             </Button>
 
                             <Button
+                                variant="secondary"
+                                size="icon"
                                 onClick={() => swiper?.slideNext()}
                                 disabled={!swiper || isEnd}
-                                className={`w-8 h-8 flex items-center justify-center text-foreground
-          ${isEnd ? "opacity-40 cursor-not-allowed" : "hover:bg-black/30"}`}
+                                className={`w-8 h-8 flex items-center justify-center bg-white text-black hover:bg-gray-200 hover:text-black shadow-sm
+          ${isEnd ? "opacity-40 cursor-not-allowed" : ""}`}
                             >
-                                <ArrowRight />
+                                <ArrowRight className="w-4 h-4" />
                             </Button>
                         </div>
                     )}

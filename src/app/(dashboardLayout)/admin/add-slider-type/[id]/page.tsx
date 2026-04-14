@@ -306,7 +306,9 @@ export default function EditSliderTypePage() {
             );
 
             const payload: Partial<SliderTypeData> = {
-                ...formData,
+                description: formData.description,
+                iconUrl: formData.iconUrl,
+                isActive: formData.isActive,
                 gameType: uniqueGameTypes.length ? uniqueGameTypes.join(",") : undefined,
                 providerCode: selectedProviders.length
                     ? selectedProviders.map((provider) => provider.providerCode).join(",")
@@ -339,7 +341,7 @@ export default function EditSliderTypePage() {
 
     if (fetching) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
+            <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800 flex items-center justify-center">
                 <div className="text-center">
                     <div className="relative">
                         <div className="w-20 h-20 border-4 border-yellow-500/20 border-t-yellow-500 rounded-full animate-spin"></div>
@@ -354,7 +356,7 @@ export default function EditSliderTypePage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-6">
+        <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800 p-6">
             <div className=" mx-auto">
                 {/* Header with breadcrumb */}
                 <div className="mb-8">
@@ -369,7 +371,7 @@ export default function EditSliderTypePage() {
                     </Link>
                     
                     <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-yellow-500/30">
+                        <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-yellow-500/30">
                             {iconPreview ? (
                                 <img src={iconPreview} alt="" className="w-10 h-10 rounded-lg object-cover" />
                             ) : (
@@ -377,7 +379,7 @@ export default function EditSliderTypePage() {
                             )}
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                            <h1 className="text-3xl font-bold bg-linear-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
                                 Edit Slider Type
                             </h1>
                             <p className="text-gray-400 mt-1 flex items-center gap-2">
@@ -413,25 +415,16 @@ export default function EditSliderTypePage() {
                                         type="text"
                                         name="name"
                                         value={formData.name}
-                                        onChange={handleInputChange}
-                                        onBlur={() => handleBlur('name')}
-                                        className={`w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/50 border ${
+                                        readOnly
+                                        className={`w-full pl-10 pr-4 py-3 rounded-xl bg-gray-900/40 border ${
                                             touched.name && errors.name
                                                 ? 'border-red-500/50 focus:border-red-500'
                                                 : 'border-gray-700 focus:border-yellow-500/50'
-                                        } text-white placeholder-gray-500 focus:outline-none transition-colors`}
+                                        } text-gray-300 placeholder-gray-500 focus:outline-none transition-colors cursor-not-allowed`}
                                         placeholder="Enter slider type name (e.g., Homepage Banner)"
                                     />
-                                    {touched.name && !errors.name && formData.name && (
-                                        <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
-                                    )}
                                 </div>
-                                {touched.name && errors.name && (
-                                    <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
-                                        <AlertCircle className="w-4 h-4" />
-                                        {errors.name}
-                                    </p>
-                                )}
+                                <p className="text-xs text-gray-500 mt-1">Name is locked and cannot be changed.</p>
                             </div>
 
                             {selectedSliderType && shouldMatchProviders && (
@@ -534,7 +527,7 @@ export default function EditSliderTypePage() {
                                     onClick={() => setUploadMethod("file")}
                                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${
                                         uploadMethod === "file"
-                                            ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
+                                            ? "bg-linear-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
                                             : "bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700"
                                     }`}
                                 >
@@ -546,7 +539,7 @@ export default function EditSliderTypePage() {
                                     onClick={() => setUploadMethod("url")}
                                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all ${
                                         uploadMethod === "url"
-                                            ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
+                                            ? "bg-linear-to-r from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-500/25"
                                             : "bg-gray-900/50 text-gray-400 hover:text-white border border-gray-700"
                                     }`}
                                 >
@@ -691,7 +684,7 @@ export default function EditSliderTypePage() {
                         <button
                             type="submit"
                             disabled={loading || Object.keys(errors).length > 0}
-                            className="flex-1 py-3 px-6 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                            className="flex-1 py-3 px-6 bg-linear-to-r from-yellow-500 to-orange-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-yellow-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
                         >
                             {loading ? (
                                 <>
@@ -721,7 +714,7 @@ export default function EditSliderTypePage() {
                 {/* Help Section */}
                 <div className="mt-8 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                     <div className="flex gap-3">
-                        <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                        <AlertCircle className="w-5 h-5 text-blue-400 shrink-0" />
                         <div>
                             <h3 className="text-sm font-medium text-blue-400">About Slider Types</h3>
                             <p className="text-xs text-blue-300/70 mt-1">

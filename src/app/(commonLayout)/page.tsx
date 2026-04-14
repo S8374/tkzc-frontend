@@ -6,7 +6,7 @@ import NavItems from "@/components/commonLayout/home/NavItems";
 export default function Home() {
   return (
     <main className="min-h-screen space-y-8 ">
-      <div className="py-2 px-2 bg-linear-to-b from-chart-4/30 to-bg-[#3B393A]">
+      <div className="py-2 px-2 bg-linear-to-b border-radius-none from-[#a79556] via-[#695f37] ">
         <Banner />
       </div>
       <NavItems />

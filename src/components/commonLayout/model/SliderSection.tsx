@@ -5,10 +5,11 @@ import CardSlider from "@/components/reUseAbleItems/CardSlider";
 import { sliderService } from "@/services/api/slider.service";
 import { oracleService } from "@/services/api/oracel.service";
 import { oracleGameApi } from "@/services/oracle.Game.Api";
-import { walletService } from "@/services/api/wallet.api";
 import { useAuth } from "@/context/AuthContext";
 import { openGameInIframe } from "@/lib/gameIframe";
 import toast from "react-hot-toast";
+
+const ORACLE_LAUNCH_MONEY = Number(process.env.NEXT_PUBLIC_ORACLE_LAUNCH_MONEY || 1);
 
 const SliderSection = ({
   type,
@@ -23,25 +24,6 @@ const SliderSection = ({
 }) => {
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
-
-  const resolveLaunchMoney = async () => {
-    const fallbackMoney = Number((user as any)?.wallet?.balance || 0);
-    if (Number.isFinite(fallbackMoney) && fallbackMoney > 0) {
-      return fallbackMoney;
-    }
-
-    try {
-      const walletResponse = await walletService.getMyWallet();
-      const apiBalance = Number(walletResponse?.data?.balance || 0);
-      if (Number.isFinite(apiBalance) && apiBalance > 0) {
-        return apiBalance;
-      }
-    } catch {
-      // Ignore wallet fetch failure and use fallback amount.
-    }
-
-    return 0;
-  };
 
   useEffect(() => {
     const fetchSliders = async () => {
@@ -101,11 +83,15 @@ const SliderSection = ({
     if (!item?.provider_code || !item?.game_code) return;
 
     try {
-      const launchMoney = await resolveLaunchMoney();
+      const username = user?.name || user?.email;
+      if (!username) {
+        toast.error("Please sign in first");
+        return;
+      }
 
       const payload = {
-        username: user?.name || user?.email || "guest_user",
-        money: launchMoney,
+        username,
+        money: Number.isFinite(ORACLE_LAUNCH_MONEY) && ORACLE_LAUNCH_MONEY > 0 ? ORACLE_LAUNCH_MONEY : 1,
         provider_code: item.provider_code,
         game_code: item.game_code || 0,
         game_type: item.game_type || 0,

@@ -125,8 +125,8 @@ const Footer = () => {
                 }}
                 className={`flex flex-col cursor-pointer items-center justify-center gap-1 flex-1 py-2 transition-all duration-200
                   ${isActive
-                    ? "text-chart-4 scale-105"
-                    : "text-white hover:text-chart-4 hover:scale-105"
+                    ? "text-[#a79556] scale-105"
+                    : "text-white hover:text-[#a79556] hover:scale-105"
                   }
                 `}
                 aria-label={item.label}
@@ -141,7 +141,7 @@ const Footer = () => {
                 </span>
 
                 {isActive && (
-                  <span className="absolute -top-1 w-1 h-1 rounded-full bg-chart-4" />
+                  <span className="absolute -top-1 w-1 h-1 rounded-full bg-[#a79556]" />
                 )}
               </button>
             );

@@ -1,8 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import api from "../api";
 
+export interface MarqueeTextTranslations {
+  en?: string;
+  zh?: string;
+  vi?: string;
+  bn?: string;
+}
+
 export interface MarqueeData {
   text: string;
+  textTranslations?: MarqueeTextTranslations;
   isActive?: boolean;
   order?: number;
   startDate?: Date;
@@ -12,6 +20,7 @@ export interface MarqueeData {
 export interface Marquee {
   _id: string;
   text: string;
+  textTranslations?: MarqueeTextTranslations;
   isActive: boolean;
   order: number;
   startDate?: string;

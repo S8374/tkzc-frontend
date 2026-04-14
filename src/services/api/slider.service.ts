@@ -10,6 +10,12 @@ export interface SliderData {
   buttonText?: string;
   buttonLink?: string;
   imageRedirectLink?: string;
+  detailTitle?: string;
+  detailSubtitle?: string;
+  activityTimeText?: string;
+  introText?: string;
+  rewardDetailsText?: string;
+  rulesText?: string;
   money?: number;
   username?: string;
   provider_code?: string;

@@ -87,7 +87,7 @@ export default function GamesPage() {
                       }`}
                   >
                     <Icon className={`w-4 h-4 ${isSelected ? 'animate-pulse' : ''}`} />
-                    {t(`tabs.${type.name.toLowerCase().replace(/\s+/g, '_')}`, type.name)}
+                    {String(t(`tabs.${type.name.toLowerCase().replace(/\s+/g, '_')}`, type.name))}
                   </button>
                 );
               })}

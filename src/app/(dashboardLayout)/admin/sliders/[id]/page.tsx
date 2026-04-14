@@ -10,7 +10,7 @@ import { sliderTypeService, type SliderType } from "@/services/api/slider.types"
 import { oracleService } from "@/services/api/oracel.service";
 import { uploadImageToImageBB } from "@/lib/imageUpload";
 
-type SliderMode = "image" | "game" | "both";
+type SliderMode = "image" | "game";
 
 type Provider = {
   code: string;
@@ -45,6 +45,12 @@ type SliderResponse = {
   game_code?: string;
   game_id?: string;
   game_type?: string;
+  detailTitle?: string;
+  detailSubtitle?: string;
+  activityTimeText?: string;
+  introText?: string;
+  rewardDetailsText?: string;
+  rulesText?: string;
   order?: number;
   isActive?: boolean;
 };
@@ -62,6 +68,12 @@ type FormDataState = {
   isActive: boolean;
   money: string;
   username: string;
+  detailTitle: string;
+  detailSubtitle: string;
+  activityTimeText: string;
+  introText: string;
+  rewardDetailsText: string;
+  rulesText: string;
 };
 
 const initialFormData: FormDataState = {
@@ -77,6 +89,12 @@ const initialFormData: FormDataState = {
   isActive: true,
   money: "",
   username: "",
+  detailTitle: "",
+  detailSubtitle: "",
+  activityTimeText: "",
+  introText: "",
+  rewardDetailsText: "",
+  rulesText: "",
 };
 
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x220?text=No+Image";
@@ -189,9 +207,8 @@ export default function EditSliderPage() {
         const slider = (sliderRes?.data || sliderRes) as SliderResponse;
         setTypes(loadedTypes);
 
-        const hasImage = Boolean(slider.image);
         const hasGame = Boolean(slider.provider_code && slider.game_code);
-        const detectedMode: SliderMode = hasImage && hasGame ? "both" : hasGame ? "game" : "image";
+        const detectedMode: SliderMode = hasGame ? "game" : "image";
         setMode(detectedMode);
 
         const resolvedSliderTypeId =
@@ -212,6 +229,12 @@ export default function EditSliderPage() {
           isActive: slider.isActive ?? true,
           money: slider.money?.toString() || "",
           username: slider.username || "",
+          detailTitle: slider.detailTitle || "",
+          detailSubtitle: slider.detailSubtitle || "",
+          activityTimeText: slider.activityTimeText || "",
+          introText: slider.introText || "",
+          rewardDetailsText: slider.rewardDetailsText || "",
+          rulesText: slider.rulesText || "",
         });
 
         if (slider.provider_code) {
@@ -245,7 +268,7 @@ export default function EditSliderPage() {
       setProviders([]);
       setGames([]);
 
-      if (!selectedType || (mode !== "game" && mode !== "both")) {
+      if (!selectedType || mode !== "game") {
         return;
       }
 
@@ -287,7 +310,7 @@ export default function EditSliderPage() {
     const loadGames = async () => {
       setGames([]);
 
-      if (!providerCode || (mode !== "game" && mode !== "both")) {
+      if (!providerCode || mode !== "game") {
         return;
       }
 
@@ -351,12 +374,12 @@ export default function EditSliderPage() {
       return false;
     }
 
-    if ((mode === "image" || mode === "both") && !formData.image) {
+    if (mode === "image" && !formData.image) {
       toast.error("Image is required for image mode");
       return false;
     }
 
-    if ((mode === "game" || mode === "both") && !selectedGame) {
+    if (mode === "game" && !selectedGame) {
       toast.error("Please select a game");
       return false;
     }
@@ -383,6 +406,12 @@ export default function EditSliderPage() {
         isActive: formData.isActive,
         money: formData.money ? Number(formData.money) : undefined,
         username: formData.username.trim() || undefined,
+        detailTitle: formData.detailTitle.trim() || undefined,
+        detailSubtitle: formData.detailSubtitle.trim() || undefined,
+        activityTimeText: formData.activityTimeText.trim() || undefined,
+        introText: formData.introText.trim() || undefined,
+        rewardDetailsText: formData.rewardDetailsText.trim() || undefined,
+        rulesText: formData.rulesText.trim() || undefined,
       };
 
       if (mode === "image") {
@@ -393,7 +422,7 @@ export default function EditSliderPage() {
         payload.game_id = undefined;
         payload.game_type = undefined;
       } else {
-        payload.image = mode === "both" ? formData.image : undefined;
+        payload.image = undefined;
         payload.provider_code = selectedGame?.provider_code;
         payload.provider_id = selectedGame?.provider_id;
         payload.game_code = selectedGame?.game_code;
@@ -441,8 +470,8 @@ export default function EditSliderPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-5">
             <h2 className="text-lg font-semibold text-white">Slider Mode</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {(["image", "game", "both"] as SliderMode[]).map((item) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(["image", "game"] as SliderMode[]).map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -510,7 +539,7 @@ export default function EditSliderPage() {
             </div>
           ) : null}
 
-          {mode === "image" || mode === "both" ? (
+          {mode === "image" ? (
             <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
               <h2 className="text-lg font-semibold text-white">Image</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -572,7 +601,60 @@ export default function EditSliderPage() {
             </div>
           ) : null}
 
-          {mode === "game" || mode === "both" ? (
+          {selectedType?.name?.toLowerCase() === "promotion" ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Promotion Detail Conditions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="detailTitle"
+                  value={formData.detailTitle}
+                  onChange={handleChange}
+                  placeholder="Detail title"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+                <input
+                  name="detailSubtitle"
+                  value={formData.detailSubtitle}
+                  onChange={handleChange}
+                  placeholder="Detail subtitle"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+              </div>
+              <input
+                name="activityTimeText"
+                value={formData.activityTimeText}
+                onChange={handleChange}
+                placeholder="Activity time text"
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <textarea
+                name="introText"
+                value={formData.introText}
+                onChange={handleChange}
+                placeholder="Intro text"
+                rows={3}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <textarea
+                name="rewardDetailsText"
+                value={formData.rewardDetailsText}
+                onChange={handleChange}
+                placeholder="Reward details (one line per condition)"
+                rows={4}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <textarea
+                name="rulesText"
+                value={formData.rulesText}
+                onChange={handleChange}
+                placeholder="Rules (one line per rule)"
+                rows={4}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+            </div>
+          ) : null}
+
+          {mode === "game" ? (
             <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
               <h2 className="text-lg font-semibold text-white">Game Selection</h2>
 

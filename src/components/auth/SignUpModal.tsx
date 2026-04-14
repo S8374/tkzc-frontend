@@ -4,7 +4,7 @@
 import { authService } from "@/services/api/auth.services";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import ReCAPTCHA from "react-google-recaptcha";
+import MathCaptcha from "./MathCaptcha";
 import toast from "react-hot-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -248,15 +248,19 @@ export default function SignUpModal({
             <span className="text-gray-300">{t('auth.iAmHuman', 'I am human')}</span>
           </div>
 
-          {/* CAPTCHA */}
+          {/* Custom Math CAPTCHA */}
           {showCaptcha && (
-            <div className="flex justify-center mt-3">
-              <ReCAPTCHA
-                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY as string}
-                onChange={() => {
+            <div className="mt-3">
+              <MathCaptcha
+                onSuccess={() => {
                   setImHuman(true);
                   toast.success(t('auth.humanVerified', 'Human verified ✅'));
+                  setShowCaptcha(false);
                 }}
+                onError={() => {
+                  setImHuman(false);
+                }}
+                theme="dark"
               />
             </div>
           )}

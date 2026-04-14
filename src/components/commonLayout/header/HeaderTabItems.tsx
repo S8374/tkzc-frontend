@@ -13,12 +13,13 @@ import { sliderTypeService } from "@/services/api/slider.types";
 import { sliderService } from "@/services/api/slider.service";
 import { oracleService } from "@/services/api/oracel.service";
 import { oracleGameApi } from "@/services/oracle.Game.Api";
-import { walletService } from "@/services/api/wallet.api";
 import { useAuth } from "@/context/AuthContext";
 import { openGameInIframe } from "@/lib/gameIframe";
 import SearchField from "@/components/reUseAbleItems/SearchField";
 import ItemsCard from "@/components/reUseAbleItems/ItemsCard";
 import toast from "react-hot-toast";
+
+const ORACLE_LAUNCH_MONEY = Number(process.env.NEXT_PUBLIC_ORACLE_LAUNCH_MONEY || 1);
 
 // Map of icons for different tab types
 const iconMap: Record<string, any> = {
@@ -38,9 +39,9 @@ const iconMap: Record<string, any> = {
 // Skeleton Loader Component
 const TabsSkeleton = () => {
   return (
-    <div className="w-full bg-[#3B393A] sticky top-16 z-40 mb-4">
+    <div className="w-full bg-[#3B393A]">
       {/* Tabs List Skeleton */}
-      <div className="sticky top-16 z-40 mb-4">
+      <div className="sticky top-16 z-40">
         <div className="w-full whitespace-nowrap bg-[#3B393A] overflow-hidden">
           <div className="inline-flex h-10 bg-[#3B393A] items-center justify-center p-1 gap-2 min-w-full">
             {/* Home Tab Skeleton */}
@@ -61,7 +62,7 @@ const TabsSkeleton = () => {
       </div>
 
       {/* Content Skeleton */}
-      <div className="relative overflow-hidden min-h-[400px] p-4">
+      <div className="relative overflow-hidden min-h-100">
         {/* Search Bar Skeleton */}
         <div className="max-w-4xl mx-auto mb-6 flex justify-end">
           <div className="w-40 h-10 bg-gray-700 rounded-lg animate-pulse"></div>
@@ -123,8 +124,10 @@ const HeaderTabItems = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("home");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const stickyTabsRef = useRef<HTMLDivElement>(null);
   const [sliderTypes, setSliderTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isTabsStuck, setIsTabsStuck] = useState(false);
 
   // Fetch slider types from API
   useEffect(() => {
@@ -187,6 +190,21 @@ const HeaderTabItems = () => {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    const checkStickyState = () => {
+      if (!stickyTabsRef.current) return;
+      const { top } = stickyTabsRef.current.getBoundingClientRect();
+      setIsTabsStuck(top <= 64);
+    };
+
+    checkStickyState();
+    window.addEventListener("scroll", checkStickyState, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", checkStickyState);
+    };
+  }, []);
+
   if (loading) {
     return <TabsSkeleton />;
   }
@@ -196,15 +214,30 @@ const HeaderTabItems = () => {
       defaultValue="home" 
       value={activeTab}
       onValueChange={setActiveTab}
-      className="w-full bg-[#3B393A] sticky"
+      className={`w-full transition-colors duration-300 ${
+        isTabsStuck ? "bg-[#18264F] " : "bg-[#3B393A]"
+      }`}
     >
       {/* Scrollable Tabs List */}
-      <div className="sticky top-16 z-40 mb-4">
+      <div
+        ref={stickyTabsRef}
+        className={`sticky top-16 z-40 transition-all duration-300 ${
+          isTabsStuck
+            ? " bg-[#18264F]/95 backdrop-blur-md border-b border-[#2D3D77]"
+            : "bg-[#3B393A]"
+        }`}
+      >
         <ScrollArea 
           ref={scrollAreaRef}
-          className="w-full whitespace-nowrap bg-[#3B393A]"
+          className={`w-full whitespace-nowrap transition-colors duration-300 ${
+            isTabsStuck ? "bg-[#18264F] -mt-2.5 py-1.5" : "bg-[#3B393A]"
+          }`}
         >
-          <TabsList className="inline-flex h-10 bg-[#3B393A] items-center justify-center p-1 text-background gap-2 min-w-full">
+          <TabsList
+            className={`inline-flex h-10 items-center  justify-center p-1  text-background gap-2 min-w-full transition-colors duration-300 ${
+              isTabsStuck ? "bg-[#18264F] " : "bg-[#3B393A]"
+            }`}
+          >
             {allTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -214,10 +247,14 @@ const HeaderTabItems = () => {
                   className={`
                     inline-flex items-center justify-center whitespace-nowrap rounded px-2 py-4 text-sm font-medium 
                     text-background ring-offset-background transition-all duration-300 ease-in-out 
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 
+                    focus-visible:outline-none focus-visible:ring-2  focus-visible:ring-ring focus-visible:ring-offset-2 
                     disabled:pointer-events-none disabled:opacity-50
-                    data-[state=active]:bg-[#525151] data-[state=active]:text-background 
-                    data-[state=active]:shadow-sm hover:bg-[#525151] data-[state=active]:rounded
+                    ${
+                      isTabsStuck
+                        ? "data-[state=active]:bg-[#253870] hover:bg-[#223567] "
+                        : "data-[state=active]:bg-[#525151] hover:bg-[#525151]"
+                    }
+                    data-[state=active]:text-background data-[state=active]:shadow-sm data-[state=active]:rounded
                     min-w-fit
                   `}
                 >
@@ -232,7 +269,7 @@ const HeaderTabItems = () => {
       </div>
 
       {/* Tabs Content */}
-      <div className="relative overflow-hidden min-h-[400px]">
+      <div className="relative overflow-hidden min-h-100">
         {/* Home Tab Content */}
         <TabsContent value="home" className="mt-0 data-[state=active]:animate-fadeIn data-[state=inactive]:animate-fadeOut">
           <HomeTabContent />
@@ -272,26 +309,8 @@ const DynamicTabContent = ({
   const [gameImageMap, setGameImageMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProviderCode, setSelectedProviderCode] = useState<string | null>(null);
   const [launchingItemId, setLaunchingItemId] = useState<string | number | null>(null);
-
-  const resolveLaunchMoney = async () => {
-    const fallbackMoney = Number((user as any)?.wallet?.balance || 0);
-    if (Number.isFinite(fallbackMoney) && fallbackMoney > 0) {
-      return fallbackMoney;
-    }
-
-    try {
-      const walletResponse = await walletService.getMyWallet();
-      const apiBalance = Number(walletResponse?.data?.balance || 0);
-      if (Number.isFinite(apiBalance) && apiBalance > 0) {
-        return apiBalance;
-      }
-    } catch {
-      // Ignore wallet fetch failure and use fallback amount.
-    }
-
-    return 0;
-  };
 
   const handleGameLaunch = async (item: any) => {
     if (launchingItemId === item?._id) return;
@@ -299,11 +318,15 @@ const DynamicTabContent = ({
     setLaunchingItemId(item?._id ?? null);
     try {
       if (item?.provider_code && item?.game_code) {
-        const launchMoney = await resolveLaunchMoney();
+        const username = user?.name || user?.email;
+        if (!username) {
+          toast.error("Please sign in first");
+          return;
+        }
 
         const payload = {
-          username: user?.name || user?.email || "guest_user",
-          money: launchMoney,
+          username,
+          money: Number.isFinite(ORACLE_LAUNCH_MONEY) && ORACLE_LAUNCH_MONEY > 0 ? ORACLE_LAUNCH_MONEY : 1,
           provider_code: item.provider_code,
           game_code: item.game_code || 0,
           game_type: item.game_type || 0,
@@ -381,7 +404,8 @@ const DynamicTabContent = ({
 
         const map: Record<string, string> = {};
         detailsList.forEach((details: any) => {
-          const games = details?.games || [];
+          const games = details?.data?.games || details?.games || [];
+
           games.forEach((game: any) => {
             if (game?.provider_code && game?.game_code && game?.image) {
               map[`${game.provider_code}:${game.game_code}`] = game.image;
@@ -398,17 +422,30 @@ const DynamicTabContent = ({
     preloadGameImages();
   }, [sliders]);
 
+  useEffect(() => {
+    setSelectedProviderCode(null);
+  }, [sliderTypeId]);
+
   // 🔎 Search filter
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return sliders;
+    const baseItems = selectedProviderCode
+      ? sliders.filter((item) => item.provider_code === selectedProviderCode)
+      : sliders;
+
+    if (!searchQuery.trim()) return baseItems;
     
     const query = searchQuery.toLowerCase();
-    return sliders.filter((item) =>
+    return baseItems.filter((item) =>
       item.title?.toLowerCase().includes(query) ||
       item.subtitle?.toLowerCase().includes(query) ||
       item.description?.toLowerCase().includes(query)
     );
-  }, [sliders, searchQuery]);
+  }, [sliders, searchQuery, selectedProviderCode]);
+
+  const providerCodes = useMemo(
+    () => Array.from(new Set(sliders.filter((item) => item.provider_code).map((item) => item.provider_code))),
+    [sliders]
+  );
 
   // 🔁 Convert API sliders → ItemsCard format
   const mappedItems = filteredItems.map((item) => ({
@@ -432,9 +469,11 @@ const DynamicTabContent = ({
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <div className="mb-6 flex justify-end">
+      <div className="mb-4">
         <SearchField
           onSearch={(q) => setSearchQuery(q)}
+          onFilterChange={(providerCode) => setSelectedProviderCode(providerCode)}
+          filters={providerCodes.map((code) => ({ id: code, label: code.toUpperCase() }))}
           placeholder={t('common.search', 'Search') + ` ${displayName}...`}
         />
       </div>

@@ -12,6 +12,7 @@ import "swiper/css/navigation";
 
 import { sliderTypeService } from "@/services/api/slider.types";
 import { marqueeService } from "@/services/api/marquee.service";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Slider {
   _id: string;
@@ -27,15 +28,30 @@ interface Slider {
 interface MarqueeItem {
   _id: string;
   text: string;
+  textTranslations?: {
+    en?: string;
+    zh?: string;
+    vi?: string;
+    bn?: string;
+  };
   isActive: boolean;
   order: number;
 }
 
 export default function Banner() {
+  const { currentLanguage } = useTranslation();
   const [slides, setSlides] = useState<Slider[]>([]);
   const [marquees, setMarquees] = useState<MarqueeItem[]>([]);
   const [loading, setLoading] = useState(true);
- console.log("marquees:", marquees);
+
+  const normalizedLanguage = currentLanguage?.toLowerCase().startsWith("zh")
+    ? "zh"
+    : currentLanguage?.toLowerCase().startsWith("vi")
+      ? "vi"
+      : currentLanguage?.toLowerCase().startsWith("bn")
+        ? "bn"
+        : "en";
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -75,12 +91,19 @@ export default function Banner() {
   }, []);
 
   // Combine all active marquee texts
-  const marqueeText = marquees.map(m => m.text).join(" • ");
-  console.log("marqueeText:", marqueeText);
+  const marqueeText = marquees
+    .map((m) => {
+      const translations = m.textTranslations || {};
+      const byCurrentLang = translations[normalizedLanguage as keyof typeof translations];
+
+      return byCurrentLang || translations.en || m.text;
+    })
+    .join(" • ");
+
   if (loading) {
     return (
       <div className="relative rounded-xl overflow-hidden">
-        <div className="bg-chart-4/30 h-10 animate-pulse"></div>
+        <div className="bg-linear-to-r from-[#7E6A24] via-[#7A6A2A] to-[#6D5C22] h-10 animate-pulse"></div>
         <div className="w-full h-[30vh] md:h-[30vh] bg-gray-800 animate-pulse"></div>
       </div>
     );
@@ -90,7 +113,7 @@ export default function Banner() {
     <div className="relative rounded-xl overflow-hidden">
       {/* Marquee - Only show if there are active marquees */}
       {marquees.length > 0 && (
-        <div className="bg-chart-4/30 ">
+        <div className="bg-linear-to-r from-[#7E6A24] via-[#7A6A2A] to-[#6D5C22]">
           <div className="p-2 flex items-center">
             <Megaphone className="text-white mr-2 ml-2" size={20} />
             <Marquee 
@@ -124,22 +147,6 @@ export default function Banner() {
                 style={{ backgroundImage: `url(${slide.image})` }}
                 data-swiper-parallax="-30%"
               />
-
-              {/* You can add title/subtitle here if needed */}
-              <div className="absolute bottom-10 left-10 text-white z-10">
-            
-                {slide.subtitle && (
-                  <p className="text-lg">{slide.subtitle}</p>
-                )}
-                {slide.buttonText && slide.buttonLink && (
-                  <a
-                    href={slide.buttonLink}
-                    className="inline-block mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                  >
-                    {slide.buttonText}
-                  </a>
-                )}
-              </div>
             </SwiperSlide>
           ))}
         </Swiper>

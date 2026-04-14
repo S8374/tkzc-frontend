@@ -21,6 +21,8 @@ import {
   Sparkles,
   ArrowRight,
   GamepadDirectional,
+  ShieldAlert,
+  LayoutDashboard,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -130,7 +132,7 @@ export default function ProfileWallet() {
         <div className="bg-[#4a4a4a] mt-4 rounded-xl p-4 mb-4">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
-              <Coins className="text-green-400" />
+              <Coins className="text-white" />
               <span className="font-semibold">Balance</span>
             </div>
             <span className="text-yellow-400 font-bold">{walletBalance.toFixed(2)}</span>
@@ -154,19 +156,19 @@ export default function ProfileWallet() {
           {/* Menu Grid */}
           <div className="grid grid-cols-4 gap-4 mt-5 text-center text-xs">
             <MenuItem icon={<FileText />} label="Balance Det" href="/balance-det" />
-            <MenuItem icon={<BarChart3 />} label="Profit Report" href="profit-report" />
-            <MenuItem icon={<Repeat />} label="Transaction" href="transaction-record" />
-            <MenuItem icon={<ClipboardList />} label="Task" href="tasks" />
-            <MenuItem icon={<Coins />} label="My Bets" href="" />
-            <MenuItem icon={<Bitcoin />} label="Buy Crypto" href="" />
-            <MenuItem icon={<Gift />} label="LuckyWheel" href="" />
+            <MenuItem icon={<BarChart3 />} label="Profit Report" href="/profit-report" />
+            <MenuItem icon={<Repeat />} label="Transaction" href="/transaction-record" />
+            <MenuItem icon={<ClipboardList />} label="Task" href="/tasks" />
+            <MenuItem icon={<Coins />} label="My Bets" href="/my-bets" />
+            <MenuItem icon={<Bitcoin />} label="Buy Crypto" href="/buy-crypto" />
+            <MenuItem icon={<Gift />} label="Lucky Wheel" href="/lucky-wheel" />
           </div>
         </div>
 
         {/* Referral */}
         <div className="bg-[#4a4a4a] rounded-xl p-4 mb-4">
           <div className="flex items-center gap-3">
-            <Gift className="text-yellow-400" />
+            <Gift className="text-white" />
             <div className="flex-1">
               <p className="text-sm">up to 0.6% bets commission</p>
               <div className="flex items-center gap-2 mt-2">
@@ -188,13 +190,18 @@ export default function ProfileWallet() {
 
         {/* List Menu */}
         <div className="bg-[#4a4a4a] rounded-xl divide-y divide-gray-600">
+          {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+            <ListItem 
+              icon={<LayoutDashboard className="text-yellow-400" />} 
+              label="Admin Dashboard" 
+              href="/admin/marquee" 
+            />
+          )}
           <ListItem icon={<ShieldCheck />} label="Safe Center" href="/safe-center" />
           <ListItem icon={<Users />} label="Affiliate" href="/affiliate" />
           <ListItem icon={<Download />} label="Vpn Download" href="/vpn-download" />
           <ListItem icon={<Sparkles />} label="LuckySpin" href="/lucky-spin" />
           <ListItem icon={<GamepadDirectional />} label="Red Packet" href="/red-packet" />
-
-
         </div>
         <div className="text-center mt-4 flex justify-center">
           <div
@@ -213,7 +220,7 @@ export default function ProfileWallet() {
 const MenuItem = ({ icon, label, href }: any) => (
   <Link href={href}>
     <div className="flex flex-col  cursor-pointer items-center gap-1 text-gray-200">
-      <div className="text-background">{icon}</div>
+      <div className="text-white">{icon}</div>
       <span>{label}</span>
     </div>
   </Link>
@@ -224,10 +231,10 @@ const ListItem = ({ icon, label, href }: any) => (
   <Link href={href} className="block">
     <div className="flex items-center justify-between p-4  transition ">
       <div className="flex items-center gap-3">
-        <span className="text-yellow-400">{icon}</span>
+        <span className="text-white">{icon}</span>
         <span>{label}</span>
       </div>
-      <ArrowRight className="text-gray-300" />
+      <ArrowRight className="text-white" />
     </div>
   </Link>
 );

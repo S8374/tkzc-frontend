@@ -10,7 +10,7 @@ import { sliderTypeService, type SliderType } from "@/services/api/slider.types"
 import { oracleService } from "@/services/api/oracel.service";
 import { uploadImageToImageBB } from "@/lib/imageUpload";
 
-type SliderMode = "image" | "game" | "both";
+type SliderMode = "image" | "game";
 
 type Provider = {
   code: string;
@@ -41,6 +41,12 @@ type FormDataState = {
   isActive: boolean;
   money: string;
   username: string;
+  detailTitle: string;
+  detailSubtitle: string;
+  activityTimeText: string;
+  introText: string;
+  rewardDetailsText: string;
+  rulesText: string;
 };
 
 const initialFormData: FormDataState = {
@@ -56,6 +62,12 @@ const initialFormData: FormDataState = {
   isActive: true,
   money: "",
   username: "",
+  detailTitle: "",
+  detailSubtitle: "",
+  activityTimeText: "",
+  introText: "",
+  rewardDetailsText: "",
+  rulesText: "",
 };
 
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x220?text=No+Image";
@@ -183,7 +195,7 @@ export default function CreateSliderPage() {
       setGames([]);
       setSelectedGameCodes(new Set());
 
-      if (!selectedType || (mode !== "game" && mode !== "both")) {
+      if (!selectedType || mode !== "game") {
         return;
       }
 
@@ -228,7 +240,7 @@ export default function CreateSliderPage() {
       setGames([]);
       setSelectedGameCodes(new Set());
 
-      if (!providerCode || (mode !== "game" && mode !== "both")) {
+      if (!providerCode || mode !== "game") {
         return;
       }
 
@@ -300,12 +312,12 @@ export default function CreateSliderPage() {
       return false;
     }
 
-    if ((mode === "image" || mode === "both") && !formData.image) {
+    if (mode === "image" && !formData.image) {
       toast.error("Image is required for image mode");
       return false;
     }
 
-    if ((mode === "game" || mode === "both") && selectedGames.length === 0) {
+    if (mode === "game" && selectedGames.length === 0) {
       toast.error("Please select at least one game");
       return false;
     }
@@ -340,6 +352,12 @@ export default function CreateSliderPage() {
         isActive: formData.isActive,
         money: formData.money ? Number(formData.money) : undefined,
         username: formData.username.trim() || undefined,
+        detailTitle: formData.detailTitle.trim() || undefined,
+        detailSubtitle: formData.detailSubtitle.trim() || undefined,
+        activityTimeText: formData.activityTimeText.trim() || undefined,
+        introText: formData.introText.trim() || undefined,
+        rewardDetailsText: formData.rewardDetailsText.trim() || undefined,
+        rulesText: formData.rulesText.trim() || undefined,
       };
 
       if (mode === "image") {
@@ -353,7 +371,7 @@ export default function CreateSliderPage() {
             createSingleSlider({
               ...basePayload,
               title: basePayload.title || game.name || game.game_code,
-              image: mode === "both" ? formData.image : undefined,
+              image: undefined,
               provider_code: game.provider_code,
               provider_id: game.provider_id,
               game_code: game.game_code,
@@ -394,7 +412,7 @@ export default function CreateSliderPage() {
 
         <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6">
           <h1 className="text-2xl font-semibold text-white">Create Slider</h1>
-          <p className="mt-1 text-sm text-gray-400">Add image sliders, game sliders, or both in one flow.</p>
+          <p className="mt-1 text-sm text-gray-400">Add image sliders or game sliders in one flow.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -469,7 +487,7 @@ export default function CreateSliderPage() {
             </div>
           ) : null}
 
-          {mode === "image" || mode === "both" ? (
+          {mode === "image" ? (
             <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
               <h2 className="text-lg font-semibold text-white">Image</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -531,7 +549,60 @@ export default function CreateSliderPage() {
             </div>
           ) : null}
 
-          {mode === "game" || mode === "both" ? (
+          {selectedType?.name?.toLowerCase() === "promotion" ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Promotion Detail Conditions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="detailTitle"
+                  value={formData.detailTitle}
+                  onChange={handleChange}
+                  placeholder="Detail title"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+                <input
+                  name="detailSubtitle"
+                  value={formData.detailSubtitle}
+                  onChange={handleChange}
+                  placeholder="Detail subtitle"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                />
+              </div>
+              <input
+                name="activityTimeText"
+                value={formData.activityTimeText}
+                onChange={handleChange}
+                placeholder="Activity time text"
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <textarea
+                name="introText"
+                value={formData.introText}
+                onChange={handleChange}
+                placeholder="Intro text"
+                rows={3}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <textarea
+                name="rewardDetailsText"
+                value={formData.rewardDetailsText}
+                onChange={handleChange}
+                placeholder="Reward details (one line per condition)"
+                rows={4}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+              <textarea
+                name="rulesText"
+                value={formData.rulesText}
+                onChange={handleChange}
+                placeholder="Rules (one line per rule)"
+                rows={4}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-3 text-white focus:border-yellow-500 focus:outline-none"
+              />
+            </div>
+          ) : null}
+
+          {mode === "game" ? (
             <div className="rounded-2xl border border-gray-800 bg-gray-950/60 p-5 md:p-6 space-y-4">
               <h2 className="text-lg font-semibold text-white">Game Selection</h2>
 
