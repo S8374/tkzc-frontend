@@ -83,7 +83,7 @@ const handleProtectedClick = (e: React.MouseEvent) => {
   }
 };
   return (
-    <div className="flex flex-wrap justify-center gap-4 sm:gap-6 md:gap-8 px-2 py-4">
+    <div className="flex flex-wrap justify-center gap-3 sm:gap-4 md:gap-6 px-2 py-2">
       {items.map((item) => (
         <Link
           key={item.href}
@@ -102,7 +102,7 @@ const handleProtectedClick = (e: React.MouseEvent) => {
           </span>
 
           <span
-            className={`w-1 h-1 rounded-full mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r ${item.color}`}
+            className={`w-1 h-1 rounded-full mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-linear-to-r ${item.color}`}
           />
         </Link>
       ))}

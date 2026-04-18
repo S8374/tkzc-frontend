@@ -117,15 +117,19 @@ const SliderSection = ({
 
   if (!items.length) return null; // hide section if empty
 
+  const isHotSection = type === "hot";
+  const fixedCardWidth = isHotSection ? "104px" : "140px";
+  const fixedCardHeight = isHotSection ? "130px" : "140px";
+
   return (
     <CardSlider
       items={items}
       title={title}
       icon={icon}
-      rounded={false}
-      cardWidth={{ base: "140px", sm: "140px", md: "160px" }}
-      cardHeight="140px"
-      spaceBetween={10}
+      rounded={true}
+      cardWidth={{ base: fixedCardWidth }}
+      cardHeight={fixedCardHeight}
+      spaceBetween={6}
       showArrows={showArrows}
       onCardClick={handleCardClick}
     />

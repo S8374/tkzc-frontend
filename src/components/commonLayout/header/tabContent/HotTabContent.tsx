@@ -31,7 +31,7 @@ const HotTabCOntent = () => {
       <ItemsCard
         items={filteredItems}
         title="Lottery Games"
-        rounded={false}
+        rounded={true}
         icon="🔥"
         cardWidth={{ base: "140px", sm: "140px", md: "160px" }}
         cardHeight="160px"

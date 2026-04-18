@@ -32,7 +32,7 @@ const HomeTabContent = () => {
       type: "live",
       translationKey: "sections.live_games",
       icon: "📺",
-      showArrows: false,
+      showArrows: true,
     },
     {
       type: "sport",

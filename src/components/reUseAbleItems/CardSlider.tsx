@@ -40,7 +40,7 @@ export default function CardSlider({
     items,
     cardWidth = { base: "120px", sm: "130px", md: "140px" },
     cardHeight = "140px",
-    spaceBetween = 14,
+    spaceBetween = 6,
     title,
     icon,
     className = "",
@@ -64,9 +64,9 @@ export default function CardSlider({
     const roundedClass = rounded ? "rounded-lg" : "";
 
     return (
-        <div className={`w-full bg-[#3B393A] px-4 py-4 ${className}`}>
+        <div className={`w-full bg-[#3B393A] px-4 py-2 ${className}`}>
             {(title || icon) && (
-                <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 text-background font-semibold">
                         {icon} <span className="text-white">{title}</span>
                     </div>
@@ -118,7 +118,10 @@ export default function CardSlider({
                     <SwiperSlide
                         key={item.id}
                         style={{
-                            width: cardWidth.base, // dynamic width for base
+                            width: cardWidth.base,
+                            minWidth: cardWidth.base,
+                            maxWidth: cardWidth.base,
+                            flexShrink: 0,
                         }}
                         className="overflow-visible!"
                     >
@@ -142,12 +145,16 @@ export default function CardSlider({
                             {/* Image */}
                             <div
                                 className="relative w-full overflow-hidden"
-                                style={{ height: cardHeight }}
+                                style={{
+                                    height: cardHeight,
+                                    minHeight: cardHeight,
+                                    maxHeight: cardHeight,
+                                }}
                             >
                                 <img
                                     src={item.imageUrl}
                                     alt={item.title}
-                                    className="absolute bg-no-repeat bg-cover inset-0 w-full h-full transition-transform duration-300 group-hover:scale-105"
+                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                     loading="lazy"
                                 />
                                 {launchingId === item.id && (

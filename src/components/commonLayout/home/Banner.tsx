@@ -38,6 +38,8 @@ interface MarqueeItem {
   order: number;
 }
 
+const HERO_BANNER_HEIGHT = "h-[150px] ";
+
 export default function Banner() {
   const { currentLanguage } = useTranslation();
   const [slides, setSlides] = useState<Slider[]>([]);
@@ -104,7 +106,7 @@ export default function Banner() {
     return (
       <div className="relative rounded-xl overflow-hidden">
         <div className="bg-linear-to-r from-[#7E6A24] via-[#7A6A2A] to-[#6D5C22] h-10 animate-pulse"></div>
-        <div className="w-full h-[30vh] md:h-[30vh] bg-gray-800 animate-pulse"></div>
+        <div className={`w-full ${HERO_BANNER_HEIGHT} bg-gray-800 animate-pulse`}></div>
       </div>
     );
   }
@@ -137,7 +139,7 @@ export default function Banner() {
           pagination={{ clickable: true }}
           navigation
           modules={[Parallax, Pagination, Navigation, Autoplay]}
-          className="w-full h-[30vh] "
+          className={`w-full ${HERO_BANNER_HEIGHT}`}
         >
           {slides.map((slide) => (
             <SwiperSlide key={slide._id}>
@@ -151,7 +153,7 @@ export default function Banner() {
           ))}
         </Swiper>
       ) : (
-        <div className="w-full h-[30vh] md:h-[30vh] bg-gray-800 flex items-center justify-center">
+        <div className={`w-full ${HERO_BANNER_HEIGHT} bg-gray-800 flex items-center justify-center`}>
           <p className="text-gray-400">No hero slides available</p>
         </div>
       )}
